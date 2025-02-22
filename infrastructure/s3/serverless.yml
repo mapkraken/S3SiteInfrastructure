@@ -1,0 +1,18 @@
+service: s3
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: us-east-2
+  stage: sit
+
+custom:
+  namespace: mapkraken
+  namespaceShort: labs
+
+  s3Sync:
+    - bucketName: mapkraken-labs-bucket
+      localDir: ./sync/mapkraken-labs
+
+resources:
+  - ${file(./resources-mapkraken-labs.yml)}
