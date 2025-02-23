@@ -17,6 +17,7 @@ Resources:
     Properties:
       Bucket: !Ref MapKrakenLabsBucket
       PolicyDocument:
+        Version: "2012-10-17"  # Added required Version
         Statement:
           - Effect: Allow
             Principal: "*"

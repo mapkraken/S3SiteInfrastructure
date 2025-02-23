@@ -6,6 +6,9 @@ provider:
   region: us-east-2
   stage: sit
 
+plugins:
+  - serverless-s3-sync
+  
 custom:
   namespace: mapkraken
   namespaceShort: labs
