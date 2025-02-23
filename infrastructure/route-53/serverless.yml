@@ -1,0 +1,13 @@
+service: route-53
+
+provider: 
+  name: aws
+  runtime: nodejs20.x
+  region: us-east-2
+  stage: sit
+
+custom:
+  namespage: mapkraken
+  namespaceShort: labs
+resources: 
+  - ${file(./resources-hosted-zones.yml)}

@@ -1,0 +1,6 @@
+WHen deploying the first time only deploy the hosted zone. 
+Once the hosted zione is deployed update the namespace at the registrar
+with the namesspaces listed in the hostedzone. 
+
+Then continue with the deployment of the other objects. 
+

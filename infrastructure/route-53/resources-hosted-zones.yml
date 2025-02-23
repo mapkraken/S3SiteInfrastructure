@@ -1,0 +1,88 @@
+Resources:
+  # Route 53 Hosted Zone
+  MapKrakenHostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      Name: "mapkraken.com"
+      HostedZoneConfig:
+        Comment: "Hosted zone for MapKraken Labs website"
+      HostedZoneTags:
+        - Key: "Environment"
+          Value: "Production"
+
+  # Certificate for SSL (must be in us-east-2 for CloudFront)
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: mapkraken.com
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: mapkraken.com
+          HostedZoneId: !Ref MapKrakenHostedZone
+
+  # CloudFront Origin Access Identity
+  OAI:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: Access to S3 bucket
+
+  # S3 Bucket Policy to allow CloudFront access
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: 
+        !ImportValue s3-sit-MapKrakenLabsBucketName
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${OAI}
+            Action: s3:GetObject
+            Resource: !Join ['', ['arn:aws:s3:::', !ImportValue s3-sit-MapKrakenLabsBucketName, '/*']]
+
+
+  # CloudFront Distribution for S3 Bucket
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - DomainName: mapkraken-labs-bucket.s3.us-east-2.amazonaws.com
+            Id: S3Origin
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+        Enabled: true
+        DefaultRootObject: index.html
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: ["GET", "HEAD"]
+          CachedMethods: ["GET", "HEAD"]
+          ForwardedValues:
+            QueryString: false
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+        Comment: "CloudFront distribution for MapKrakenLabs S3 website"
+
+  # Route 53 Alias Record pointing to CloudFront
+  WebsiteARecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref MapKrakenHostedZone
+      Name: "mapkraken.com"
+      Type: "A"
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront Hosted Zone ID (Global)
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+
+Outputs:
+  HostedZoneId:
+    Description: "ID of the Route 53 Hosted Zone"
+    Value: !Ref MapKrakenHostedZone
+
+  CloudFrontURL:
+    Description: "CloudFront URL for the website"
+    Value: !GetAtt CloudFrontDistribution.DomainName
