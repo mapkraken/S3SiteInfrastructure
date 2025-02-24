@@ -5,7 +5,6 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "deploy:sit": "STAGE=${STAGE:-sit} NAMESPACE=mapkraken NAMESPACE_SHORT=labs serverless deploy --stage sit --region us-east-2"
   },
   "keywords": [
     "S3",
