@@ -1,38 +1,44 @@
 Resources:
-  MapKrakenLabsBucket:
+  SiteBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: mapkraken-labs-bucket
+      BucketName: ${self:custom.environment.BUCKET_NAME}
       WebsiteConfiguration:
         IndexDocument: index.html
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         IgnorePublicAcls: false
-        BlockPublicPolicy: false  # This allows public policies to be applied
+        BlockPublicPolicy: false
         RestrictPublicBuckets: false
   BucketPolicy:
     Type: AWS::S3::BucketPolicy
     DependsOn:
-      - MapKrakenLabsBucket
+      - SiteBucket
     Properties:
-      Bucket: !Ref MapKrakenLabsBucket
+      Bucket: !Ref SiteBucket
       PolicyDocument:
-        Version: "2012-10-17"  # Added required Version
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal: "*"
             Action: 
               - "s3:GetObject"
-            Resource: !Join ['', ['arn:aws:s3:::', !Ref MapKrakenLabsBucket, '/*']]
+            Resource: !Join ['', ['arn:aws:s3:::', !Ref SiteBucket, '/*']]
 Outputs:
-  MapKrakenLabsBucketWebsiteURL:
-    Description: "Website URL of the MapKrakenLabsBucket"
-    Value: !Sub "${MapKrakenLabsBucket}.s3-website-${AWS::Region}.amazonaws.com"
+  SiteBucketWebsiteURL:
+    Description: "Website URL of the ${self:custom.environment.APP_NAME} site bucket"
+    Value: !Sub "${SiteBucket}.s3-website-${AWS::Region}.amazonaws.com"
     Export:
-      Name: !Sub "${AWS::StackName}-MapKrakenLabsBucketNameWebsiteURL"
-  MapKrakenLabsBucketName:
-    Description: "Name of the MapKrakenLabsBucket"
-    Value: !Ref MapKrakenLabsBucket
+      Name: !Sub "${self:provider.stage}-BucketNameWebsiteURL"
+  BucketName:
+    Description: "Name of the ${self:custom.environment.APP_NAME} site bucket"
+    Value: !Ref SiteBucket
     Export:
-      Name: !Sub "${AWS::StackName}-MapKrakenLabsBucketName"
+      Name: !Sub "${self:provider.stage}-BucketName"
+  DomainName:
+    Description: The domain name of the ${self:custom.environment.APP_NAME} S3 bucket
+    Value: !GetAtt SiteBucket.DomainName
+    Export:
+      Name: !Sub "${self:provider.stage}-DomainName"
+
 

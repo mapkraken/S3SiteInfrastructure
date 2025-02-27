@@ -10,6 +10,7 @@ plugins:
   - serverless-s3-sync
   
 custom:
+  environment: ${file(./environment.yml):${self:provider.stage}}
   namespace: mapkraken
   namespaceShort: labs
 
