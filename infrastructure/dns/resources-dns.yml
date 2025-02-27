@@ -1,19 +1,17 @@
 Resources:
-  MapKrakenHostedZone:
+  HostedZone:
     Type: AWS::Route53::HostedZone
     Properties:
-      Name: "mapkraken.com"
+      Name: ${self:custom.environment.DOMAIN_NAME}
       HostedZoneConfig:
-        Comment: "Hosted zone for MapKraken Labs website"
-      HostedZoneTags:
-        - Key: "Environment"
-          Value: "Production"
+        Comment: ${self:custom.environment.ZONE_COMMENT}
+      HostedZoneTags: ${self:custom.environment.HOSTED_ZONE_TAGS}
 Outputs:
   HostedZoneId:
-    Value: !Ref MapKrakenHostedZone
+    Value: !Ref HostedZone
     Export:
-      Name: !Sub "${AWS::StackName}-HostedZoneId"
+      Name: !Sub "${self:provider.stage}-HostedZoneId"
   NameServers:
-    Value: !Join [',', !GetAtt MapKrakenHostedZone.NameServers]
+    Value: !Join [',', !GetAtt HostedZone.NameServers]
     Export:
-      Name: !Sub "${AWS::StackName}-NameServers"
+      Name: !Sub "${self:provider.stage}-NameServers"

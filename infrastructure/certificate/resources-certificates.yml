@@ -2,13 +2,13 @@ Resources:
   Certificate:
     Type: AWS::CertificateManager::Certificate
     Properties:
-      DomainName: mapkraken.com
+      DomainName: ${self:custom.environment.DOMAIN_NAME}
       ValidationMethod: DNS
       DomainValidationOptions:
-        - DomainName: mapkraken.com
-          HostedZoneId: !ImportValue dns-sit-HostedZoneId  # From DNS stack
+        - DomainName: ${self:custom.environment.DOMAIN_NAME}
+          HostedZoneId: !ImportValue ${self:provider.stage}-HostedZoneId  # From DNS stack
 Outputs:
   CertificateArn:
     Value: !Ref Certificate
     Export:
-      Name: !Sub "${AWS::StackName}-CertificateArn"
+      Name: !Sub "${self:provider.stage}-CertificateArn"
