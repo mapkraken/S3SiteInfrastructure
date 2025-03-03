@@ -1,0 +1,8 @@
+sit:
+  DOMAIN_NAME: mapkraken.com  
+
+stg:
+  DOMAIN_NAME: mapkraken.com
+
+prd:
+  DOMAIN_NAME: mapkraken.com

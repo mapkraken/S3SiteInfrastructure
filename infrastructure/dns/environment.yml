@@ -1,0 +1,24 @@
+sit:
+  DOMAIN_NAME: mapkraken.com
+  ZONE_COMMENT: "Hosted zone for mapkraken.com and subdomains"
+  HOSTED_ZONE_TAGS:
+    - Key: "Environment"
+      Value: SIT
+    - Key: "Project"
+      Value: "MapKraken"
+stg:
+  DOMAIN_NAME: mapkraken.com
+  ZONE_COMMENT: "Hosted zone for mapkraken.com and subdomains"
+  HOSTED_ZONE_TAGS:
+    - Key: "Environment"
+      Value: STG
+    - Key: "Project"
+      Value: "MapKraken"
+prd:
+  DOMAIN_NAME: mapkraken.com
+  ZONE_COMMENT: "Hosted zone for mapkraken.com and subdomains"
+  HOSTED_ZONE_TAGS:
+    - Key: "Environment"
+      Value: PRD
+    - Key: "Project"
+      Value: "MapKraken"

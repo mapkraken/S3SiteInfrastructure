@@ -1,0 +1,9 @@
+sit:
+  APP_NAME: MapKraken
+  BUCKET_NAME: mapkraken-bucket
+stg:
+  APP_NAME: MapKrakenLabs
+  BUCKET_NAME: mapkraken-bucket
+prd:
+  APP_NAME: MapKrakenLabs
+  BUCKET_NAME: mapkraken-bucket
