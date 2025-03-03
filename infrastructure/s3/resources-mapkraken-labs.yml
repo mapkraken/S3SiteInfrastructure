@@ -2,7 +2,19 @@ Resources:
   SiteBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: ${self:custom.environment.BUCKET_NAME}
+      BucketName: ${self:provider.stage}-${self:custom.environment.BUCKET_NAME}
+      WebsiteConfiguration:
+        IndexDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        IgnorePublicAcls: false
+        BlockPublicPolicy: false
+        RestrictPublicBuckets: false
+  
+  SiteBucketLabs:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: "${self:provider.stage}-labs-${self:custom.environment.BUCKET_NAME}"
       WebsiteConfiguration:
         IndexDocument: index.html
       PublicAccessBlockConfiguration:
@@ -24,12 +36,21 @@ Resources:
             Action: 
               - "s3:GetObject"
             Resource: !Join ['', ['arn:aws:s3:::', !Ref SiteBucket, '/*']]
+  BucketPolicyLabs:
+    Type: AWS::S3::BucketPolicy
+    DependsOn:
+      - SiteBucketLabs
+    Properties:
+      Bucket: !Ref SiteBucketLabs
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+              - "s3:GetObject"
+            Resource: !Join ['', ['arn:aws:s3:::', !Ref SiteBucketLabs, '/*']]
 Outputs:
-  SiteBucketWebsiteURL:
-    Description: "Website URL of the ${self:custom.environment.APP_NAME} site bucket"
-    Value: !Sub "${SiteBucket}.s3-website-${AWS::Region}.amazonaws.com"
-    Export:
-      Name: !Sub "${self:provider.stage}-BucketNameWebsiteURL"
   BucketName:
     Description: "Name of the ${self:custom.environment.APP_NAME} site bucket"
     Value: !Ref SiteBucket
@@ -40,5 +61,15 @@ Outputs:
     Value: !GetAtt SiteBucket.DomainName
     Export:
       Name: !Sub "${self:provider.stage}-DomainName"
+  BucketNameLabs:
+    Description: "Name of the ${self:custom.environment.APP_NAME} site bucket in STG"
+    Value: !Ref SiteBucketLabs
+    Export:
+      Name: !Sub "${self:provider.stage}-BucketNameLabs"
+  DomainNameLabs:
+    Description: The domain name of the ${self:custom.environment.APP_NAME} S3 bucket in STG
+    Value: !GetAtt SiteBucketLabs.DomainName
+    Export:
+      Name: !Sub "${self:provider.stage}-DomainNameLabs"
 
 
