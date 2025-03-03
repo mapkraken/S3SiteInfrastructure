@@ -1,0 +1,133 @@
+Parameters:
+  Stage:
+    Type: String
+    AllowedValues: ["prd", "stg", "sit"]
+    Default: "sit"
+
+Conditions:
+  IsPrd: !Equals [!Ref Stage, "prd"]
+  IsStg: !Equals [!Ref Stage, "stg"]
+  IsSit: !Equals [!Ref Stage, "sit"]
+# Parameters:
+#   Stage:
+#     Type: String
+#     Default: sit # Matches serverless.yml default
+
+# Conditions:
+#   IsNotProd:
+#     !Not [!Equals [!Ref Stage, 'prd']] # True if Stage != 'prd'
+
+Resources:
+  OAI:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: Access to S3 bucket  
+  OAILabs:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: Access to S3 bucket
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !ImportValue ${self:provider.stage}-BucketName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${OAI}"
+            Action: "s3:GetObject"
+            Resource: !Join ['', ['arn:aws:s3:::', !ImportValue '${self:provider.stage}-BucketName', '/*']]
+  BucketPolicyLabs:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !ImportValue ${self:provider.stage}-BucketNameLabs
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${OAI}"
+            Action: "s3:GetObject"
+            Resource: !Join ['', ['arn:aws:s3:::', !ImportValue '${self:provider.stage}-BucketNameLabs', '/*']]
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - DomainName: !ImportValue "${self:provider.stage}-DomainName"
+            Id: S3Origin
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${OAI}"
+        Enabled: true
+        DefaultRootObject: index.html
+        Aliases:
+          - !If [IsPrd, "mapkraken.com", !Sub "${self:provider.stage}.${self:custom.environment.DOMAIN_NAME}"]
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: ["GET", "HEAD"]
+          CachedMethods: ["GET", "HEAD"]
+          ForwardedValues:
+            QueryString: false 
+        ViewerCertificate:
+          AcmCertificateArn: !ImportValue "${self:provider.stage}-CertificateArn"
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        Comment: ${self:custom.environment.DISTRIBUTION_COMMENT}
+  CloudFrontDistributionLabs:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - DomainName: !ImportValue "${self:provider.stage}-DomainNameLabs"
+            Id: S3Origin
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${OAILabs}"
+        Enabled: true
+        DefaultRootObject: index.html
+        Aliases:        
+          - !If [IsPrd, "labs.mapkraken.com", !Sub "${self:provider.stage}-labs.${self:custom.environment.DOMAIN_NAME}"]  # e.g., sit-labs.mapkraken.com
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: ["GET", "HEAD"]
+          CachedMethods: ["GET", "HEAD"]
+          ForwardedValues:
+            QueryString: false 
+        ViewerCertificate:
+          AcmCertificateArn: !ImportValue "${self:provider.stage}-CertificateArn"
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        Comment: ${self:custom.environment.DISTRIBUTION_COMMENT_LABS}
+  WebsiteARecordRoot:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !ImportValue ${self:provider.stage}-HostedZoneId
+      Name: ${self:custom.environment.DOMAIN_NAME}.  # mapkraken.com
+      Type: "A"
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront Hosted Zone ID
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+
+  WebsiteARecordStage:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !ImportValue ${self:provider.stage}-HostedZoneId
+      Name: !Sub "${self:provider.stage}.${self:custom.environment.DOMAIN_NAME}."  # sit.mapkraken.com
+      Type: "A"
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront Hosted Zone ID
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+
+  WebsiteARecordLabs:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !ImportValue ${self:provider.stage}-HostedZoneId
+      Name: !If [IsPrd, "labs.mapkraken.com", !Sub "${self:provider.stage}-labs.${self:custom.environment.DOMAIN_NAME}."]  # sit-labs.mapkraken.com
+      Type: "A"
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront Hosted Zone ID
+        DNSName: !GetAtt CloudFrontDistributionLabs.DomainName
