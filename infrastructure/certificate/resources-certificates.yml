@@ -3,10 +3,19 @@ Resources:
     Type: AWS::CertificateManager::Certificate
     Properties:
       DomainName: ${self:custom.environment.DOMAIN_NAME}
+      SubjectAlternativeNames:
+        - sit.${self:custom.environment.DOMAIN_NAME}
+        - sit-labs.${self:custom.environment.DOMAIN_NAME}
       ValidationMethod: DNS
       DomainValidationOptions:
         - DomainName: ${self:custom.environment.DOMAIN_NAME}
-          HostedZoneId: !ImportValue ${self:provider.stage}-HostedZoneId  # From DNS stack
+          HostedZoneId: !ImportValue ${self:provider.stage}-HostedZoneId
+        - DomainName: sit.${self:custom.environment.DOMAIN_NAME}
+          HostedZoneId: !ImportValue ${self:provider.stage}-HostedZoneId
+        - DomainName: labs.${self:custom.environment.DOMAIN_NAME}
+          HostedZoneId: !ImportValue ${self:provider.stage}-HostedZoneId
+        - DomainName: sit-labs.${self:custom.environment.DOMAIN_NAME}
+          HostedZoneId: !ImportValue ${self:provider.stage}-HostedZoneId
 Outputs:
   CertificateArn:
     Value: !Ref Certificate
