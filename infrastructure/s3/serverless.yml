@@ -5,6 +5,13 @@ provider:
   runtime: nodejs20.x
   region: us-east-1
   stage: sit
+  deploymentBucket: 
+    name: ${self:provider.stage}-${self:provider.region}-serverless-stacks
+    maxPreviousDeploymentArtifacts: 2
+    tags:
+      Environment: ${self:provider.stage}  # Changed to object format
+      Project: mapkraken
+      Stack: ${self:service}
 
 plugins:
   - serverless-s3-sync
@@ -15,7 +22,9 @@ custom:
   namespaceShort: labs
 
   s3Sync:
-    - bucketName: mapkraken-labs-bucket
+    - bucketName: ${self:provider.stage}-${self:custom.environment.BUCKET_NAME}
+      localDir: ./sync/mapkraken
+    - bucketName: ${self:provider.stage}-labs-${self:custom.environment.BUCKET_NAME}
       localDir: ./sync/mapkraken-labs
 
 resources:
