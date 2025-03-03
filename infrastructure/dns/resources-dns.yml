@@ -1,4 +1,14 @@
+Parameters:
+  Stage:
+    Type: String
+    Default: sit # Matches serverless.yml default
+
+Conditions:
+  IsNotProd:
+    !Not [!Equals [!Ref Stage, 'prd']] # True if Stage != 'prd'
+
 Resources:
+
   HostedZone:
     Type: AWS::Route53::HostedZone
     Properties:
@@ -6,12 +16,9 @@ Resources:
       HostedZoneConfig:
         Comment: ${self:custom.environment.ZONE_COMMENT}
       HostedZoneTags: ${self:custom.environment.HOSTED_ZONE_TAGS}
+
 Outputs:
   HostedZoneId:
     Value: !Ref HostedZone
     Export:
       Name: !Sub "${self:provider.stage}-HostedZoneId"
-  NameServers:
-    Value: !Join [',', !GetAtt HostedZone.NameServers]
-    Export:
-      Name: !Sub "${self:provider.stage}-NameServers"
