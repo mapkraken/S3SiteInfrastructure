@@ -2,35 +2,94 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leaflet Map - Florida</title>
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <title>XYO World Geotoken Mapper</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <style>
-        #map {
-            height: 600px; /* Adjust height as needed */
-            width: 100%;
-        }
+        #map { height: 600px; }
     </style>
 </head>
 <body>
     <div id="map"></div>
-
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <div id="info" style="padding: 10px; background: white;"></div>
     <script>
-        // Initialize the map and set its view to Florida
-        var map = L.map('map').setView([27.9944, -81.7603], 7); // Lat, Lon, Zoom level
+        var map = L.map('map').setView([0, 0], 2); // Start at zoom level 2 for simplicity
 
-        // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 18,
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        // Optional: Add a marker at the center of Florida (e.g., near Lake Okeechobee)
-        var marker = L.marker([27.9944, -81.7603]).addTo(map);
-        marker.bindPopup("<b>Welcome to Florida!</b>").openPopup();
+        // Function to convert lat/lon to tile coordinates
+        function latLonToTileCoords(lat, lon, zoom) {
+            var siny = Math.sin(lat * Math.PI / 180);
+            siny = Math.min(Math.max(siny, -0.9999), 0.9999);
+            var x = (lon + 180) / 360 * (1 << zoom);
+            var y = (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) * (1 << zoom);
+            return { x: x, y: y };
+        }
+
+        // Function to calculate geotoken ID based on quadtree logic
+        function calculateGeotokenID(latlng, zoom) {
+            var tile = latLonToTileCoords(latlng.lat, latlng.lng, zoom);
+            var id = quadKeyFromTileCoords(Math.floor(tile.x), Math.floor(tile.y), zoom);
+            return id;
+        }
+
+        // Quadkey generation for tile coordinates
+        function quadKeyFromTileCoords(x, y, zoom) {
+            var quadKey = "";
+            for (var i = zoom; i > 0; i--) {
+                var digit = 0;
+                var mask = 1 << (i - 1);
+                if ((x & mask) != 0) digit++;
+                if ((y & mask) != 0) digit += 2;
+                quadKey += digit;
+            }
+            return quadKey;
+        }
+
+        // Function to generate a GeoJSON polygon from tile coordinates
+        function tileCoordsToGeoJSON(x, y, zoom) {
+            var bounds = L.bounds(
+                map.unproject([x, y + 1], zoom),
+                map.unproject([x + 1, y], zoom)
+            );
+            return {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[
+                        [bounds.min.x, bounds.min.y],
+                        [bounds.max.x, bounds.min.y],
+                        [bounds.max.x, bounds.max.y],
+                        [bounds.min.x, bounds.max.y],
+                        [bounds.min.x, bounds.min.y]
+                    ]]
+                },
+                "properties": {}
+            };
+        }
+
+        map.on('click', function(e) {
+            var zoom = map.getZoom();
+            var geotokenID = calculateGeotokenID(e.latlng, zoom);
+            var tile = latLonToTileCoords(e.latlng.lat, e.latlng.lng, zoom);
+            var geojson = tileCoordsToGeoJSON(Math.floor(tile.x), Math.floor(tile.y), zoom);
+
+            document.getElementById('info').innerHTML = `<p>Zoom Level: ${zoom}</p>
+                                                         <p>Geotoken ID: ${geotokenID}</p>
+                                                         <a href="https://app.world.xyo.network/geotoken/${geotokenID}">Geotoken Viewer</a>
+                                                         <p>LatLng: ${e.latlng.lat}, ${e.latlng.lng}</p>`;
+
+            // Show the tile boundary on the map
+            L.geoJSON(geojson, {
+                style: {
+                    color: 'red',
+                    weight: 2,
+                    opacity: 0.65
+                }
+            }).addTo(map);
+        });
     </script>
 </body>
 </html>
