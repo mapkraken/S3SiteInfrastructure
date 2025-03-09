@@ -1,9 +1,30 @@
 sit:
   APP_NAME: MapKraken
   BUCKET_NAME: mapkraken-bucket
+  DOMAIN_NAME: mapkraken.com
+  ZONE_COMMENT: "Hosted zone for mapkraken.com and subdomains"
+  HOSTED_ZONE_TAGS:
+    - Key: "Environment"
+      Value: SIT
+    - Key: "Project"
+      Value: "MapKraken"
 stg:
   APP_NAME: MapKrakenLabs
   BUCKET_NAME: mapkraken-bucket
+  DOMAIN_NAME: mapkraken.com
+  ZONE_COMMENT: "Hosted zone for mapkraken.com and subdomains"
+  HOSTED_ZONE_TAGS:
+    - Key: "Environment"
+      Value: SIT
+    - Key: "Project"
+      Value: "MapKraken"
 prd:
   APP_NAME: MapKrakenLabs
   BUCKET_NAME: mapkraken-bucket
+  DOMAIN_NAME: mapkraken.com
+  ZONE_COMMENT: "Hosted zone for mapkraken.com and subdomains"
+  HOSTED_ZONE_TAGS:
+    - Key: "Environment"
+      Value: SIT
+    - Key: "Project"
+      Value: "MapKraken"

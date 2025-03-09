@@ -4,18 +4,14 @@ Resources:
     Properties:
       DomainName: ${self:custom.environment.DOMAIN_NAME}
       SubjectAlternativeNames:
-        - sit.${self:custom.environment.DOMAIN_NAME}
-        - sit-labs.${self:custom.environment.DOMAIN_NAME}
+          - !If [OnlyCreateResourceInPRD, !Ref "AWS::NoValue", "${self:provider.stage}.${self:custom.environment.DOMAIN_NAME}"]
+          - !If [OnlyCreateResourceInPRD, "labs.${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}-labs.${self:custom.environment.DOMAIN_NAME}"]
       ValidationMethod: DNS
       DomainValidationOptions:
-        - DomainName: ${self:custom.environment.DOMAIN_NAME}
-          HostedZoneId: !ImportValue ${self:provider.stage}-HostedZoneId
-        - DomainName: sit.${self:custom.environment.DOMAIN_NAME}
-          HostedZoneId: !ImportValue ${self:provider.stage}-HostedZoneId
-        - DomainName: labs.${self:custom.environment.DOMAIN_NAME}
-          HostedZoneId: !ImportValue ${self:provider.stage}-HostedZoneId
-        - DomainName: sit-labs.${self:custom.environment.DOMAIN_NAME}
-          HostedZoneId: !ImportValue ${self:provider.stage}-HostedZoneId
+          - DomainName: !If [OnlyCreateResourceInPRD, "${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}.${self:custom.environment.DOMAIN_NAME}"]
+            HostedZoneId: !ImportValue "HostedZoneId"
+          - DomainName: !If [OnlyCreateResourceInPRD, "labs.${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}-labs.${self:custom.environment.DOMAIN_NAME}"]
+            HostedZoneId: !ImportValue "HostedZoneId"
 Outputs:
   CertificateArn:
     Value: !Ref Certificate

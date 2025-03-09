@@ -1,16 +1,7 @@
-Parameters:
-  Stage:
-    Type: String
-    Default: sit # Matches serverless.yml default
-
-Conditions:
-  IsNotProd:
-    !Not [!Equals [!Ref Stage, 'prd']] # True if Stage != 'prd'
-
 Resources:
-
   HostedZone:
     Type: AWS::Route53::HostedZone
+    Condition: OnlyCreateResourceInPRD
     Properties:
       Name: ${self:custom.environment.DOMAIN_NAME}
       HostedZoneConfig:
@@ -19,6 +10,7 @@ Resources:
 
 Outputs:
   HostedZoneId:
+    Condition: OnlyCreateResourceInPRD
     Value: !Ref HostedZone
     Export:
-      Name: !Sub "${self:provider.stage}-HostedZoneId"
+      Name: !Sub "HostedZoneId"

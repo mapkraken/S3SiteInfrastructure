@@ -1,0 +1,5 @@
+Conditions:
+  OnlyCreateResourceInPRD:
+    Fn::Equals:
+      - ${self:provider.stage}
+      - prd
