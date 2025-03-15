@@ -6,11 +6,14 @@ Resources:
       SubjectAlternativeNames:
           - !If [OnlyCreateResourceInPRD, !Ref "AWS::NoValue", "${self:provider.stage}.${self:custom.environment.DOMAIN_NAME}"]
           - !If [OnlyCreateResourceInPRD, "labs.${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}-labs.${self:custom.environment.DOMAIN_NAME}"]
+          - !If [OnlyCreateResourceInPRD, "terriamap.${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}-terriamap.${self:custom.environment.DOMAIN_NAME}"]
       ValidationMethod: DNS
       DomainValidationOptions:
           - DomainName: !If [OnlyCreateResourceInPRD, "${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}.${self:custom.environment.DOMAIN_NAME}"]
             HostedZoneId: !ImportValue "HostedZoneId"
           - DomainName: !If [OnlyCreateResourceInPRD, "labs.${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}-labs.${self:custom.environment.DOMAIN_NAME}"]
+            HostedZoneId: !ImportValue "HostedZoneId"
+          - DomainName: !If [OnlyCreateResourceInPRD, "terriamap.${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}-terriamap.${self:custom.environment.DOMAIN_NAME}"]
             HostedZoneId: !ImportValue "HostedZoneId"
 Outputs:
   CertificateArn:
