@@ -57,6 +57,52 @@ Resources:
           MinimumProtocolVersion: TLSv1.2_2021
         Comment: ${self:custom.environment.DISTRIBUTION_COMMENT_LABS}
 
+  CloudFrontDistributionTerriamap:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Origins:
+          - Id: ALBOrigin
+            DomainName: !ImportValue ${self:provider.stage}-ALBDNSName
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only  # Use 'match-viewer' if ALB uses HTTPS
+        DefaultCacheBehavior:
+          TargetOriginId: ALBOrigin
+          ViewerProtocolPolicy: allow-all  # Change to 'redirect-to-https' if using SSL
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+            - PUT
+            - POST
+            - PATCH
+            - DELETE
+          CachedMethods:
+            - GET
+            - HEAD
+          ForwardedValues:
+            QueryString: true
+            Cookies:
+              Forward: all
+            Headers:
+              - '*'
+          Compress: true
+          DefaultTTL: 86400  # 24 hours
+          MinTTL: 0
+          MaxTTL: 31536000  # 1 year
+        Aliases:
+          - !If [OnlyCreateResourceInPRD, !Sub "terriamap.${self:custom.environment.DOMAIN_NAME}", !Sub "${self:provider.stage}-terriamap.${self:custom.environment.DOMAIN_NAME}"]
+        ViewerCertificate:
+          AcmCertificateArn: !ImportValue ${self:provider.stage}-CertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        HttpVersion: http2
+
+        Comment: ${self:custom.environment.DISTRIBUTION_COMMENT_TERRIAMAP}
+
   WebsiteARecord:
     Type: AWS::Route53::RecordSet
     Properties:
@@ -72,6 +118,16 @@ Resources:
     Properties:
       HostedZoneId: !ImportValue HostedZoneId
       Name: !If [OnlyCreateResourceInPRD, "labs.${self:custom.environment.DOMAIN_NAME}.", "${self:provider.stage}-labs.${self:custom.environment.DOMAIN_NAME}."]
+      Type: "A"
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront Hosted Zone ID
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+  
+  WebsiteARecordTerriamap:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !ImportValue HostedZoneId
+      Name: !If [OnlyCreateResourceInPRD, "terriamap.${self:custom.environment.DOMAIN_NAME}.", "${self:provider.stage}-terriamap.${self:custom.environment.DOMAIN_NAME}."]
       Type: "A"
       AliasTarget:
         HostedZoneId: Z2FDTNDATAQYW2  # CloudFront Hosted Zone ID

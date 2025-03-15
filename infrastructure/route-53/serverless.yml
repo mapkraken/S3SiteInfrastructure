@@ -15,7 +15,7 @@ provider:
 
 custom:
   environment: ${file(./environment.yml):${self:provider.stage}}
-  namespage: mapkraken
+  namespace: mapkraken
   namespaceShort: labs
 resources: 
   - ${file(./conditions.yml)}
