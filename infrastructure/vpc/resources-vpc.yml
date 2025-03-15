@@ -1,0 +1,97 @@
+Resources:
+  # New Resources for ALB and Fargate
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: "10.0.0.0/16"
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "sit-mapkraken-vpc"
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.1.0/24"
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-${self:custom.namespace}-public-subnet-1"
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.2.0/24"
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-${self:custom.namespace}-public-subnet-2"
+  
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-${self:custom.namespace}-igw"
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-${self:custom.namespace}-route-table"
+  Route:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref RouteTable
+
+  SubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref RouteTable
+  # TODO: Private subnet here when needed
+  # ECSCluster:
+  #   Type: AWS::ECS::Cluster
+  #   Properties:
+  #     ClusterName: !Sub "${self:provider.stage}-${self:custom.namespace}-cluster"
+  #     Tags:
+  #       - Key: Stage
+  #         Value: ${self:provider.stage}
+  #       - Key: Namespace
+  #         Value: ${self:custom.namespace}
+  #       - Key: Name
+  #         Value: !Sub "${self:provider.stage}-${self:custom.namespace}-cluster"
+Outputs: 
+  PublicSubnet1:
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: !Sub "${self:provider.stage}-PublicSubnet1"
+  PublicSubnet2:
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: !Sub "${self:provider.stage}-PublicSubnet2"
+  VPC:
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${self:provider.stage}-VPC"
