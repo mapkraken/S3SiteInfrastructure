@@ -1,0 +1,20 @@
+service: ecr
+
+provider: 
+  name: aws
+  runtime: nodejs20.x
+  region: us-east-1
+  stage: ${opt:stage, 'sit'}
+  deploymentBucket: 
+    name: ${self:provider.stage}-mapkraken-serverless-stacks
+    maxPreviousDeploymentArtifacts: 2
+    tags:
+      Environment: ${self:provider.stage}  # Changed to object format
+      Project: mapkraken
+      Stack: ${self:service}
+
+custom:
+  namespace: mapkraken
+  namespaceShort: labs
+resources:
+  - ${file(./resources-ecr.yml)}
