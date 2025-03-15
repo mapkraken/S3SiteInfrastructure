@@ -1,0 +1,125 @@
+Resources:
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "ecs-tasks.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "ecs-task-execution-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:BatchGetImage"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+  TaskRole:
+    Type: AWS::IAM::Role
+    DependsOn: 
+      - TerriamapSharingBucket
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "ecs-tasks.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "ecs-task-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "s3:PutObject"
+                  - "s3:PutObjectAcl"
+                  - "s3:GetObject"
+                  - "s3:GetObjectAcl"
+                  - "s3:ListBucket"
+                Resource: !Join
+                  - ""
+                  - - "arn:aws:s3:::"
+                    - !Ref TerriamapSharingBucket
+                    - "/*"
+  TerriamapTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    DependsOn: 
+      - TaskExecutionRole
+      - TaskRole
+    Properties:
+      Family: !Sub "${self:provider.stage}-terriamap-task"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: "256"  # 0.25 vCPU
+      Memory: "512"  # 0.5 GB
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: ${self:provider.stage}-terriamap-container
+          Image: 273354623129.dkr.ecr.us-east-1.amazonaws.com/sit-terriamap
+          PortMappings:
+            - ContainerPort: 3001
+          Essential: true
+
+  FargateSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security group for Fargate tasks"
+      VpcId: !ImportValue ${self:provider.stage}-VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !ImportValue ${self:provider.stage}-ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 3001
+          ToPort: 3001
+          SourceSecurityGroupId: !ImportValue ${self:provider.stage}-ALBSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-terriamap-fargate-sg"
+
+  TerriamapFargateService:
+    Type: AWS::ECS::Service
+    DependsOn: 
+      - TerriamapTaskDefinition
+    Properties:
+      Cluster: !ImportValue  ${self:provider.stage}-ECSClusterName
+      ServiceName: !Sub "${self:provider.stage}-terriamap-service"
+      TaskDefinition: !Ref TerriamapTaskDefinition
+      DesiredCount: ${self:custom.environment.TERRIAMAP_DESIRED_COUNT}
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets:
+            - Fn::ImportValue: ${self:provider.stage}-PublicSubnet1
+            - Fn::ImportValue: ${self:provider.stage}-PublicSubnet2
+          SecurityGroups:
+            - !Ref FargateSecurityGroup
+          AssignPublicIp: ENABLED
+      LoadBalancers:
+        - TargetGroupArn: !ImportValue ${self:provider.stage}-TargetGroupFargateARN
+          ContainerName: !Sub "${self:provider.stage}-terriamap-container"
+          ContainerPort: ${self:custom.environment.TERRIAMAP_CONTAINER_PORT}
+
+  # ApiARecord:
+  #   Type: AWS::Route53::RecordSet
+  #   Properties:
+  #     HostedZoneId: !ImportValue prd-HostedZoneId
+  #     Name: !If [OnlyCreateResourceInPRD, "api.${self:custom.environment.DOMAIN_NAME}.", "${self:provider.stage}-api.${self:custom.environment.DOMAIN_NAME}."]
+  #     Type: "A"
+  #     AliasTarget:
+  #       HostedZoneId: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
+  #       DNSName: !GetAtt ApplicationLoadBalancer.DNSName

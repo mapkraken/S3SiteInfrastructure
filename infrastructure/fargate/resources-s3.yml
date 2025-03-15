@@ -1,0 +1,8 @@
+Resources:
+
+  TerriamapSharingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: ${self:provider.stage}-terriamap-sharing
+
+  
