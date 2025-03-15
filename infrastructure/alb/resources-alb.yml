@@ -1,0 +1,105 @@
+Resources:
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security group for ALB"
+      VpcId: 
+        Fn::ImportValue: "${self:provider.stage}-VPC"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: "0.0.0.0/0"
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-${self:custom.namespace}-alb-sg"
+
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${self:provider.stage}-${self:custom.namespace}-alb"
+      Subnets:
+        - !ImportValue ${self:provider.stage}-PublicSubnet1
+        - !ImportValue ${self:provider.stage}-PublicSubnet2
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Scheme: internet-facing
+      Type: application
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-${self:custom.namespace}-alb"
+
+  TargetGroupFargate:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${self:provider.stage}-fargate-tg"
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: "/"
+      HealthCheckProtocol: HTTP
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      HealthCheckTimeoutSeconds: 5
+      VpcId: 
+        Fn::ImportValue: "${self:provider.stage}-VPC"
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-fargate-tg"
+        - Key: Stage
+          Value: !Ref "AWS::StackName"
+
+  ListenerHTTPFargate:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn: TargetGroupFargate
+    Properties:
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroupFargate
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+  ListenerHTTPSFargate:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn: TargetGroupFargate
+    Properties:
+      Port: 443
+      Protocol: HTTPS
+      SslPoliucy: ELBSecurityPolicy-TLS-1-2-2017-01
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroupFargate
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Certificates:
+        - CertificateArn: !ImportValue ${self:provider.stage}-CertificateArn
+Outputs:
+  ALBDNSName:
+    Description: "DNS name of the Application Load Balancer"
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub "${self:provider.stage}-ALBDNSName"
+  TargetGroupFargateARN:
+    Description: "ARN of the Fargate target group"
+    Value: !Ref TargetGroupFargate
+    Export:
+      Name: !Sub "${self:provider.stage}-TargetGroupFargateARN"
+  TargetGroupFargateName:
+    Description: "Name of the Fargate target group"
+    Value: !Sub "${self:provider.stage}-fargate-tg"
+    Export:
+      Name: !Sub "${self:provider.stage}-TargetGroupFargateName"
+  ALBSecurityGroup:
+    Description: "Security group for ALB"
+    Value: !Ref ALBSecurityGroup
+    Export:
+      Name: !Sub "${self:provider.stage}-ALBSecurityGroup"
+  ListenerHTTPSFargateArn:
+    Description: "HTTPS listener for Fargate"
+    Value: !Ref ListenerHTTPSFargate
+    Export:
+      Name: !Sub "${self:provider.stage}-ListenerHTTPSFargateArn"
