@@ -1,0 +1,19 @@
+{
+  "name": "ecs",
+  "version": "0.0.1",
+  "description": "MapKrakenLabs ecs resources",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ECS",
+    "MapKrakenLabs"
+  ],
+  "author": "Tyler McCracken",
+  "license": "ISC",
+  "dependencies": {
+    "save": "^2.9.0",
+    "serverless": "^4.6.3"
+  }
+}

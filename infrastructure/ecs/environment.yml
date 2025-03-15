@@ -1,0 +1,15 @@
+sit:
+  DOMAIN_NAME: mapkraken.com
+  HOSTED_ZONE_ID: Z2FDTNDATAQYW2
+  DISTRIBUTION_COMMENT: CloudFront sit distribution for MapKraken S3 website
+  DISTRIBUTION_COMMENT_LABS: CloudFront distribution for MapKrakenLabs S3 website
+stg:
+  DOMAIN_NAME: mapkraken.com
+  HOSTED_ZONE_ID: Z2FDTNDATAQYW2
+  DISTRIBUTION_COMMENT: CloudFront stg distribution for MapKraken S3 website
+  DISTRIBUTION_COMMENT_LABS: CloudFront distribution for MapKrakenLabs S3 website
+prd:
+  DOMAIN_NAME: mapkraken.com
+  HOSTED_ZONE_ID: Z2FDTNDATAQYW2
+  DISTRIBUTION_COMMENT: CloudFront distribution for MapKraken S3 website
+  DISTRIBUTION_COMMENT_LABS: CloudFront distribution for MapKrakenLabs S3 website

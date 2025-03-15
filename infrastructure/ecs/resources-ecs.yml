@@ -1,0 +1,14 @@
+Resources:
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${self:provider.stage}-${self:custom.namespace}-cluster"
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-${self:custom.namespace}-cluster"
+Outputs:
+  ECSClusterName:
+    Description: "Name of the ECS Cluster"
+    Value: !Ref ECSCluster
+    Export:
+      Name: !Sub "${self:provider.stage}-ECSClusterName"
