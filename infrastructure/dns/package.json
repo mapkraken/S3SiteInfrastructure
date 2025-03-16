@@ -1,7 +1,7 @@
 {
-  "name": "route-53",
+  "name": "dns",
   "version": "0.0.1",
-  "description": "MapKrakenLabs Route 53 resources",
+  "description": "MapKrakenLabs DNS resources",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
