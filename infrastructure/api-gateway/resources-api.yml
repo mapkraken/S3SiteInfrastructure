@@ -1,0 +1,205 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: API Gateway and Lambda setup for portfolio query function
+
+Parameters:
+  Stage:
+    Type: String
+    Default: sit
+    Description: Deployment stage (e.g., sit, prod)
+
+Resources:
+  # Lambda Function to Query DynamoDB Portfolio Items
+  PortfolioQueryLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${self:provider.stage}-portfolio-query"
+      Handler: index.handler
+      Runtime: nodejs20.x
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          REGION: !Ref AWS::Region  # Dynamically sets to stack region (e.g., us-east-1)
+      Code:
+        ZipFile: |
+          const { DynamoDBClient, QueryCommand } = require('@aws-sdk/client-dynamodb');
+          const client = new DynamoDBClient({ region: 'us-east-1' });
+
+          exports.handler = async (event) => {
+            console.log('Lambda invoked with event:', JSON.stringify(event, null, 2));
+            try {
+              const params = {
+                TableName: 'sit-MapKrakenContentTable',
+                KeyConditionExpression: 'PK = :pk',
+                ExpressionAttributeValues: { ':pk': { S: 'PORTFOLIO#1' } }
+              };
+              console.info('Querying DynamoDB with params:', JSON.stringify(params, null, 2));
+              const command = new QueryCommand(params);
+              const result = await client.send(command);
+              console.info('Query result:', JSON.stringify(result.Items || [], null, 2));
+              return {
+                statusCode: 200,
+                body: JSON.stringify(result.Items || []),
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Access-Control-Allow-Origin': '*'
+                }
+              };
+            } catch (error) {
+              console.error('Error querying DynamoDB:', error);
+              return {
+                statusCode: 500,
+                body: JSON.stringify({ error: 'Internal server error', details: error.message }),
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Access-Control-Allow-Origin': '*'
+                }
+              };
+            }
+          };
+      Timeout: 10
+
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:provider.stage}-MapKrakenContentTable"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
+  # IAM Role for API Gateway CloudWatch Logs
+  APIGatewayCloudWatchLogsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CloudWatchLogsAccess1
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:PutLogEvents
+                  - logs:PutLogEvents
+                Resource: "arn:aws:logs:${self:provider.region}:${aws:accountId}:log-group:*:log-stream:*" # Resource: "*" # arn:aws:logs:eu-west-1:123456789:log-group:API-Gateway-Execution-Logs_alphanum/stage:log-stream:*
+        - PolicyName: CloudWatchLogsAccess2
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                  - logs:FilterLogEvents
+                  - logs:CreateLogGroup
+                Resource: "arn:aws:logs:${self:provider.region}:${aws:accountId}:log-group:*" # Resource: "*" # arn:aws:logs:eu-west-1:123456789:log-group:API-Gateway-Execution-Logs_alphanum/stage
+
+              # - Effect: Allow
+              #   Action:
+              #     - apigateway:POST
+              #     - apigateway:PATCH
+              #     - apigateway:GET
+              #     - apigateway:DELETE
+              #     - apigateway:PUT
+              #   Resource: "*"
+                
+
+  # API Gateway Account Settings
+  APIGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    DependsOn: 
+      - APIGatewayCloudWatchLogsRole
+    Properties:
+      CloudWatchRoleArn: !GetAtt APIGatewayCloudWatchLogsRole.Arn
+
+
+
+  # API Gateway
+  PortfolioApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub "${self:provider.stage}-portfolio-api"
+
+  PortfolioResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref PortfolioApi
+      ParentId: !GetAtt PortfolioApi.RootResourceId
+      PathPart: "portfolio"
+
+  PortfolioMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref PortfolioApi
+      ResourceId: !Ref PortfolioResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PortfolioQueryLambda.Arn}/invocations"
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          ResponseModels:
+            application/json: Empty
+
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref PortfolioQueryLambda
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PortfolioApi}/*/*"
+
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: 
+      - PortfolioMethod
+    Properties:
+      RestApiId: !Ref PortfolioApi
+
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    DependsOn:
+      - ApiDeployment
+    Properties:
+      RestApiId: !Ref PortfolioApi
+      DeploymentId: !Ref ApiDeployment
+      StageName: !Ref Stage
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+Outputs:
+  PortfolioApiId:
+    Description: "ID of the Portfolio API"
+    Value: !Ref PortfolioApi
+    Export:
+      Name: !Sub "${self:provider.stage}-PortfolioApiId"
