@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: DynamoDB big table for content microservices with an examples partition.
+
+Parameters:
+  TableName:
+    Type: String
+    Default: MapKrakenContentTable
+    Description: Name of the DynamoDB table.
+
+Resources:
+  # DynamoDB Table
+  ContentTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${opt:stage, 'dev'}-${TableName}"
+      # PK and SK for single-table design
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S  # Partition key (e.g., EXAMPLE#123)
+        - AttributeName: SK
+          AttributeType: S  # Sort key (e.g., #DETAILS)
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST  # Free tier eligible, no WCUs/RCUs
+      # Optional: Streams for future event-driven updates
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  # IAM Role for Lambda
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DynamoDBWriteAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:BatchWriteItem
+                Resource: !GetAtt ContentTable.Arn
+        - PolicyName: LambdaLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  # Lambda Function to Seed Data
+  # SeedDataLambda:
+  #   Type: AWS::Lambda::Function
+  #   Properties:
+  #     Handler: index.handler
+  #     Role: !GetAtt LambdaExecutionRole.Arn
+  #     Runtime: nodejs18.x
+  #     Timeout: 30
+  #     Code:
+  #       ZipFile: |
+  #         const AWS = require('aws-sdk');
+  #         const dynamodb = new AWS.DynamoDB.DocumentClient();
+
+  #         exports.handler = async (event, context) => {
+  #           const tableName = event.ResourceProperties.TableName;
+  #           const seedData = event.ResourceProperties.SeedData;
+
+  #           if (event.RequestType === 'Create' || event.RequestType === 'Update') {
+  #             try {
+  #               for (const item of seedData) {
+  #                 await dynamodb.put({
+  #                   TableName: tableName,
+  #                   Item: item
+  #                 }).promise();
+  #               }
+  #               return {
+  #                 PhysicalResourceId: `SeedData-${tableName}`,
+  #                 Status: 'SUCCESS'
+  #               };
+  #             } catch (error) {
+  #               console.error('Error seeding data:', error);
+  #               return {
+  #                 PhysicalResourceId: `SeedData-${tableName}`,
+  #                 Status: 'FAILED',
+  #                 Reason: error.message
+  #               };
+  #             }
+  #           }
+  #           return { Status: 'SUCCESS' };
+  #         };
+
+  # Custom Resource to Seed Examples Data
+  # SeedDataCustomResource:
+  #   Type: Custom::SeedData
+  #   DependsOn: ContentTable
+  #   Properties:
+  #     ServiceToken: !GetAtt SeedDataLambda.Arn
+  #     TableName: !Ref TableName
+  #     SeedData:
+  #       - PK: "EXAMPLE#1"
+  #         SK: "#DETAILS"
+  #         name: "Portfolio Site"
+  #         description: "A personal portfolio built with React and AWS."
+  #         githubUrl: "https://github.com/user/portfolio"
+  #         siteUrl: "https://portfolio.example.com"
+  #         thumbnail: "https://s3.example.com/thumbs/portfolio.jpg"
+  #       - PK: "EXAMPLE#2"
+  #         SK: "#DETAILS"
+  #         name: "Task Manager"
+  #         description: "A simple task app using Node.js and DynamoDB."
+  #         githubUrl: "https://github.com/user/task-manager"
+  #         siteUrl: "https://tasks.example.com"
+  #         thumbnail: "https://s3.example.com/thumbs/tasks.jpg"
+
+Outputs:
+  ContentTableARN:
+    Description: ARN of the DynamoDB table
+    Value: !GetAtt ContentTable.Arn
+    Export:
+      Name: !Sub "${self:provider.stage}-ContentTableARN"
+  ContentTableStreamArn:
+    Description: ARN of the table's stream
+    Value: !GetAtt ContentTable.StreamArn
+    Export:
+      Name: !Sub "${self:provider.stage}-ContentTableStreamArn"
