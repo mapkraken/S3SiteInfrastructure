@@ -1,11 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: API Gateway and Lambda setup for portfolio query function
 
-Parameters:
-  Stage:
-    Type: String
-    Default: sit
-    Description: Deployment stage (e.g., sit, prod)
 
 Resources:
   # Lambda Function to Query DynamoDB Portfolio Items
@@ -28,7 +23,7 @@ Resources:
             console.log('Lambda invoked with event:', JSON.stringify(event, null, 2));
             try {
               const params = {
-                TableName: 'sit-MapKrakenContentTable',
+                TableName: '${self:provider.stage}-MapKrakenContentTable',
                 KeyConditionExpression: 'PK = :pk',
                 ExpressionAttributeValues: { ':pk': { S: 'PORTFOLIO#1' } }
               };
@@ -105,7 +100,6 @@ Resources:
               - Effect: Allow
                 Action:
                   - logs:PutLogEvents
-                  - logs:PutLogEvents
                 Resource: "arn:aws:logs:${self:provider.region}:${aws:accountId}:log-group:*:log-stream:*" # Resource: "*" # arn:aws:logs:eu-west-1:123456789:log-group:API-Gateway-Execution-Logs_alphanum/stage:log-stream:*
         - PolicyName: CloudWatchLogsAccess2
           PolicyDocument:
@@ -119,7 +113,7 @@ Resources:
                   - logs:FilterLogEvents
                   - logs:CreateLogGroup
                 Resource: "arn:aws:logs:${self:provider.region}:${aws:accountId}:log-group:*" # Resource: "*" # arn:aws:logs:eu-west-1:123456789:log-group:API-Gateway-Execution-Logs_alphanum/stage
-
+              
               # - Effect: Allow
               #   Action:
               #     - apigateway:POST
@@ -193,7 +187,7 @@ Resources:
     Properties:
       RestApiId: !Ref PortfolioApi
       DeploymentId: !Ref ApiDeployment
-      StageName: !Ref Stage
+      StageName: ${self:provider.stage}
       MethodSettings:
         - ResourcePath: "/*"
           HttpMethod: "*"
