@@ -37,7 +37,7 @@ Resources:
         - Key: Name
           Value: !Sub "${self:provider.stage}-${self:custom.namespace}-alb"
 
-  TargetGroupFargate:
+  TargetGroupTerriamap:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: !Sub "${self:provider.stage}-fargate-tg"
@@ -58,52 +58,83 @@ Resources:
         - Key: Stage
           Value: !Ref "AWS::StackName"
 
-  ListenerHTTPFargate:
+  TargetGroupKoop:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${self:provider.stage}-koop-tg"
+      VpcId: !ImportValue ${self:provider.stage}-VPC
+      Port: 8080
+      Protocol: HTTP
+      TargetType: ip # Fargate uses 'ip' for awsvpc networking
+      HealthCheckPath: "/" # Adjust if Koop has a specific health endpoint
+      HealthCheckProtocol: HTTP
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-koop-tg"
+
+  ListenerHTTPTerriamap:
     Type: AWS::ElasticLoadBalancingV2::Listener
-    DependsOn: TargetGroupFargate
+    DependsOn: TargetGroupTerriamap
     Properties:
       Port: 80
       Protocol: HTTP
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref TargetGroupFargate
+          TargetGroupArn: !Ref TargetGroupTerriamap
       LoadBalancerArn: !Ref ApplicationLoadBalancer
-  ListenerHTTPSFargate:
+
+  # Listener for ALB (Port 80 → Target Group 8080)
+  KoopListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
-    DependsOn: TargetGroupFargate
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 8080  # Changed from 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroupKoop
+
+  ListenerHTTPSTerriamap:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn: TargetGroupTerriamap
     Properties:
       Port: 443
       Protocol: HTTPS
       SslPoliucy: ELBSecurityPolicy-TLS-1-2-2017-01
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref TargetGroupFargate
+          TargetGroupArn: !Ref TargetGroupTerriamap
       LoadBalancerArn: !Ref ApplicationLoadBalancer
       Certificates:
         - CertificateArn: !ImportValue ${self:provider.stage}-CertificateArn
+
 Outputs:
   ALBDNSName:
     Description: "DNS name of the Application Load Balancer"
     Value: !GetAtt ApplicationLoadBalancer.DNSName
     Export:
       Name: !Sub "${self:provider.stage}-ALBDNSName"
-  TargetGroupFargateARN:
+  TargetGroupTerriamapARN:
     Description: "ARN of the Fargate target group"
-    Value: !Ref TargetGroupFargate
+    Value: !Ref TargetGroupTerriamap
     Export:
-      Name: !Sub "${self:provider.stage}-TargetGroupFargateARN"
-  TargetGroupFargateName:
+      Name: !Sub "${self:provider.stage}-TargetGroupTerriamapARN"
+  TargetGroupTerriamapName:
     Description: "Name of the Fargate target group"
     Value: !Sub "${self:provider.stage}-fargate-tg"
     Export:
-      Name: !Sub "${self:provider.stage}-TargetGroupFargateName"
+      Name: !Sub "${self:provider.stage}-TargetGroupTerriamapName"
   ALBSecurityGroup:
     Description: "Security group for ALB"
     Value: !Ref ALBSecurityGroup
     Export:
       Name: !Sub "${self:provider.stage}-ALBSecurityGroup"
-  ListenerHTTPSFargateArn:
+  ListenerHTTPSTerriamapArn:
     Description: "HTTPS listener for Fargate"
-    Value: !Ref ListenerHTTPSFargate
+    Value: !Ref ListenerHTTPSTerriamap
     Export:
-      Name: !Sub "${self:provider.stage}-ListenerHTTPSFargateArn"
+      Name: !Sub "${self:provider.stage}-ListenerHTTPSTerriamapArn"
