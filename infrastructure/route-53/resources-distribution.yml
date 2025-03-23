@@ -5,7 +5,57 @@ Resources:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
       CloudFrontOriginAccessIdentityConfig:
-        Comment: Access to S3 bucket  
+        Comment: Access to S3 bucket
+
+  LambdaEdgeFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler  # Update the handler to match the inline code
+      Runtime: nodejs20.x
+      Role: !GetAtt LambdaEdgeRole.Arn
+      Code:
+        ZipFile: |
+          'use strict';
+          exports.handler = (event, context, callback) => {
+            const request = event.Records[0].cf.request;
+            const uri = request.uri;
+            const spaRoutes = ['/', '/portfolio'];
+            const assetRegex = /\.(js|css|png|jpg|jpeg|gif|ico|html|woff|woff2|ttf|eot|svg)$/;
+            if (spaRoutes.includes(uri) && !assetRegex.test(uri)) {
+              request.uri = '/index.html';
+            }
+            callback(null, request);
+          };
+
+  LambdaEdgeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - edgelambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaEdgePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
+  LambdaEdgeVersion:
+    Type: AWS::Lambda::Version
+    Properties:
+      FunctionName: !Ref LambdaEdgeFunction
+
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -26,11 +76,15 @@ Resources:
           CachedMethods: ["GET", "HEAD"]
           ForwardedValues:
             QueryString: false
+          LambdaFunctionAssociations:
+            - EventType: origin-request
+              LambdaFunctionARN: !Ref LambdaEdgeVersion
         ViewerCertificate:
           AcmCertificateArn: !ImportValue ${self:provider.stage}-CertificateArn
           SslSupportMethod: sni-only
           MinimumProtocolVersion: TLSv1.2_2021
         Comment: ${self:custom.environment.DISTRIBUTION_COMMENT}
+        
   CloudFrontDistributionLabs:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -192,7 +246,7 @@ Resources:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId: !ImportValue HostedZoneId
-      Name: !Sub "${self:provider.stage}-api.${self:custom.environment.DOMAIN_NAME}."
+      Name: !If [OnlyCreateResourceInPRD, "api.${self:custom.environment.DOMAIN_NAME}.", "${self:provider.stage}-api.${self:custom.environment.DOMAIN_NAME}."]
       Type: A
       AliasTarget:
         HostedZoneId: Z2FDTNDATAQYW2  # CloudFront Hosted Zone ID
