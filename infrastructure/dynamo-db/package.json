@@ -4,7 +4,13 @@
   "description": "MapKrakenLabs DynamoDB resources",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy:sit": "serverless deploy --stage prd --region us-east-1 --verbose",
+    "seed:sit": "./scripts/seed.sh sit",
+    "deploy:stg": "serverless deploy --stage prd --region us-east-1 --verbose",
+    "seed:stg": "./scripts/seed.sh stg",
+    "deploy:prd": "serverless deploy --stage prd --region us-east-1 --verbose",
+    "seed:prd": "./scripts/seed.sh prd"
   },
   "keywords": [
     "DynamoDB",
