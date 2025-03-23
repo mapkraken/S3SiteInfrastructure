@@ -11,5 +11,5 @@ Resources:
         - Field: host-header
           Values:
             - ${self:custom.environment.TERRIAMAP_DOMAIN}
-      ListenerArn: !ImportValue ${self:provider.stage}-ListenerHTTPSFargateArn
+      ListenerArn: !ImportValue ${self:provider.stage}-ListenerHTTPSTerriamapArn
       Priority: 12
