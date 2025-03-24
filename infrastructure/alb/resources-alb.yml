@@ -11,8 +11,8 @@ Resources:
           ToPort: 80
           CidrIp: "0.0.0.0/0"
         - IpProtocol: tcp
-          FromPort: 8080 # koop
-          ToPort: 8080
+          FromPort: 9000 # koop
+          ToPort: 9000
           CidrIp: "0.0.0.0/0"
         - IpProtocol: tcp
           FromPort: 443
@@ -63,7 +63,7 @@ Resources:
     Properties:
       Name: !Sub "${self:provider.stage}-koop-tg"
       VpcId: !ImportValue ${self:provider.stage}-VPC
-      Port: 8080
+      Port: 9000
       Protocol: HTTP
       TargetType: ip # Fargate uses 'ip' for awsvpc networking
       HealthCheckPath: "/" # Adjust if Koop has a specific health endpoint
@@ -87,12 +87,12 @@ Resources:
           TargetGroupArn: !Ref TargetGroupTerriamap
       LoadBalancerArn: !Ref ApplicationLoadBalancer
 
-  # Listener for ALB (Port 80 → Target Group 8080)
+  # Listener for Koop
   KoopListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       LoadBalancerArn: !Ref ApplicationLoadBalancer
-      Port: 8080  # Changed from 80
+      Port: 9000
       Protocol: HTTP
       DefaultActions:
         - Type: forward
@@ -118,13 +118,18 @@ Outputs:
     Value: !GetAtt ApplicationLoadBalancer.DNSName
     Export:
       Name: !Sub "${self:provider.stage}-ALBDNSName"
+  TargetGroupKoopARN:
+    Description: "ARN of the Koop target group"
+    Value: !Ref TargetGroupKoop
+    Export:
+      Name: !Sub "${self:provider.stage}-TargetGroupKoopARN"
   TargetGroupTerriamapARN:
-    Description: "ARN of the Fargate target group"
+    Description: "ARN of the Terriamap target group"
     Value: !Ref TargetGroupTerriamap
     Export:
       Name: !Sub "${self:provider.stage}-TargetGroupTerriamapARN"
   TargetGroupTerriamapName:
-    Description: "Name of the Fargate target group"
+    Description: "Name of the Terriamap target group"
     Value: !Sub "${self:provider.stage}-fargate-tg"
     Export:
       Name: !Sub "${self:provider.stage}-TargetGroupTerriamapName"
@@ -134,7 +139,7 @@ Outputs:
     Export:
       Name: !Sub "${self:provider.stage}-ALBSecurityGroup"
   ListenerHTTPSTerriamapArn:
-    Description: "HTTPS listener for Fargate"
+    Description: "HTTPS listener for Terriamap"
     Value: !Ref ListenerHTTPSTerriamap
     Export:
       Name: !Sub "${self:provider.stage}-ListenerHTTPSTerriamapArn"
