@@ -87,6 +87,10 @@ Resources:
           FromPort: 3001
           ToPort: 3001
           SourceSecurityGroupId: !ImportValue ${self:provider.stage}-ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 9000
+          ToPort: 9000
+          SourceSecurityGroupId: !ImportValue ${self:provider.stage}-ALBSecurityGroup
       Tags:
         - Key: Name
           Value: !Sub "${self:provider.stage}-terriamap-fargate-sg"
@@ -114,61 +118,61 @@ Resources:
           ContainerName: !Sub "${self:provider.stage}-terriamap-container"
           ContainerPort: ${self:custom.environment.TERRIAMAP_CONTAINER_PORT}
 
-  # # Log Group
-  # KoopLogGroup:
-  #   Type: AWS::Logs::LogGroup
-  #   Properties:
-  #     LogGroupName: !Sub "/ecs/${self:provider.stage}-koop"
-  #     RetentionInDays: 30
-  # # Task Definition
-  # KoopTaskDefinition:
-  #   Type: AWS::ECS::TaskDefinition
-  #   DependsOn: 
-  #     - KoopLogGroup
-  #   Properties:
-  #     Family: !Sub "${self:provider.stage}-koop-task"
-  #     NetworkMode: awsvpc
-  #     RequiresCompatibilities:
-  #       - FARGATE
-  #     Cpu: "256" # 0.25 vCPU
-  #     Memory: "512" # 512 MB
-  #     ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
-  #     ContainerDefinitions:
-  #       - Name: koop
-  #         Image: "koopjs/koop:latest"
-  #         PortMappings:
-  #           - ContainerPort: 8080
-  #             HostPort: 8080
-  #             Protocol: tcp
-  #         Essential: true
-  #         LogConfiguration:
-  #           LogDriver: awslogs
-  #           Options:
-  #             awslogs-group: !Ref KoopLogGroup
-  #             awslogs-region: !Ref AWS::Region
-  #             awslogs-stream-prefix: koop
+  # Log Group
+  KoopLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${self:provider.stage}-koop"
+      RetentionInDays: 30
+  # Task Definition
+  KoopTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    DependsOn: 
+      - KoopLogGroup
+    Properties:
+      Family: !Sub "${self:provider.stage}-koop-task"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: "256" # 0.25 vCPU
+      Memory: "512" # 512 MB
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      ContainerDefinitions:
+        - Name: koop
+          Image: 273354623129.dkr.ecr.us-east-1.amazonaws.com/sit-koop
+          PortMappings:
+            - ContainerPort: 9000
+              HostPort: 9000
+              Protocol: tcp
+          Essential: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref KoopLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: koop
 
-  # # Fargate Service
-  # KoopService:
-  #   Type: AWS::ECS::Service
-  #   Properties:
-  #     Cluster: !ImportValue  ${self:provider.stage}-ECSClusterName
-  #     ServiceName: !Sub "${self:provider.stage}-koop-service"
-  #     TaskDefinition: !Ref KoopTaskDefinition
-  #     DesiredCount: 1
-  #     LaunchType: FARGATE
-  #     NetworkConfiguration:
-  #       AwsvpcConfiguration:
-  #         Subnets:
-  #           - Fn::ImportValue: ${self:provider.stage}-PublicSubnet1
-  #           - Fn::ImportValue: ${self:provider.stage}-PublicSubnet2
-  #         SecurityGroups:
-  #           - !Ref FargateSecurityGroup
-  #         AssignPublicIp: ENABLED
-  #     LoadBalancers:
-  #       - TargetGroupArn: !ImportValue ${self:provider.stage}-TargetGroupTerriamapARN
-  #         ContainerName: koop
-  #         ContainerPort: 8080
+  # Fargate Service
+  KoopService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !ImportValue  ${self:provider.stage}-ECSClusterName
+      ServiceName: !Sub "${self:provider.stage}-koop-service"
+      TaskDefinition: !Ref KoopTaskDefinition
+      DesiredCount: 0
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets:
+            - Fn::ImportValue: ${self:provider.stage}-PublicSubnet1
+            - Fn::ImportValue: ${self:provider.stage}-PublicSubnet2
+          SecurityGroups:
+            - !Ref FargateSecurityGroup
+          AssignPublicIp: ENABLED
+      LoadBalancers:
+        - TargetGroupArn: !ImportValue ${self:provider.stage}-TargetGroupKoopARN
+          ContainerName: koop
+          ContainerPort: 9000
   # ApiARecord:
   #   Type: AWS::Route53::RecordSet
   #   Properties:
