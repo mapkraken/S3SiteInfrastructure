@@ -22,6 +22,29 @@ Resources:
               }
             ]
           }
+  KoopRepository:
+    Type: 'AWS::ECR::Repository'
+    Properties:
+      RepositoryName: !Sub "${self:provider.stage}-koop"
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Expire untagged images older than 30 days",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 30
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
 Outputs:
   # ccb-plugins.
   TerriamapRepoARN:
@@ -30,3 +53,10 @@ Outputs:
       Fn::GetAtt: [ TerriaMapRepository, Arn ]
     Export:
       Name: ${self:provider.stage}-TerriamapRepoARN
+  # ccb-plugins.
+  KoopRepoARN:
+    Description: ARN of ECR resource
+    Value:
+      Fn::GetAtt: [ KoopRepository, Arn ]
+    Export:
+      Name: ${self:provider.stage}-KoopRepoARN
