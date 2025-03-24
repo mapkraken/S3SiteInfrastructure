@@ -19,6 +19,4 @@ custom:
   namespaceShort: labs
 resources:
   - ${file(./resources-fargate.yml)}
-  # - ${file(./resources-listeners.yml)}
   - ${file(./resources-s3.yml)}
-  # - ${file(./resources-targetgroup.yml)}
