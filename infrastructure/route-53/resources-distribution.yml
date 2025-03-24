@@ -166,7 +166,7 @@ Resources:
           - Id: ALBOrigin
             DomainName: !ImportValue ${self:provider.stage}-ALBDNSName
             CustomOriginConfig:
-              HTTPPort: 80
+              HTTPPort: 9000
               HTTPSPort: 443
               OriginProtocolPolicy: http-only  # Use 'match-viewer' if ALB uses HTTPS
         DefaultCacheBehavior:
