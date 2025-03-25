@@ -139,10 +139,10 @@ Resources:
       ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
       ContainerDefinitions:
         - Name: koop
-          Image: 273354623129.dkr.ecr.us-east-1.amazonaws.com/sit-koop
+          Image: ${self:custom.environment.KOOP_ECR_URL}
           PortMappings:
-            - ContainerPort: 9000
-              HostPort: 9000
+            - ContainerPort: ${self:custom.environment.KOOP_CONTAINER_PORT}
+              HostPort: ${self:custom.environment.KOOP_CONTAINER_PORT}
               Protocol: tcp
           Essential: true
           LogConfiguration:
@@ -159,7 +159,7 @@ Resources:
       Cluster: !ImportValue  ${self:provider.stage}-ECSClusterName
       ServiceName: !Sub "${self:provider.stage}-koop-service"
       TaskDefinition: !Ref KoopTaskDefinition
-      DesiredCount: 0
+      DesiredCount: ${self:custom.environment.KOOP_DESIRED_COUNT}
       LaunchType: FARGATE
       NetworkConfiguration:
         AwsvpcConfiguration:
