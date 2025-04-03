@@ -1,0 +1,42 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to set up an EC2 instance in a private subnet of sit-VPC for running Shmig with access to RDS.
+
+Parameters:
+  BastionAllowedIp:
+    Type: String
+    Description: Your public IP address for SSH access (e.g., 203.0.113.45/32)
+    Default: 0.0.0.0/0 # Temporary wide-open for testing, tighten later
+
+Resources: 
+  BastionHost:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: ami-00a929b66ed6e0de6 # Amazon Linux 2 (adjust for region)
+      SubnetId: !ImportValue ${self:provider.stage}-PublicSubnet1
+      SecurityGroupIds:
+        - !Ref BastionSecurityGroup
+      KeyName: ${self:provider.stage}-bastion-key-pair # Replace with your SSH key pair
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-bastion-key-pair"
+
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Bastion host security group
+      VpcId: !ImportValue ${self:provider.stage}-VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref BastionAllowedIp
+          # CidrIp: 47.195.132.252/32 # Replace with your public IP
+
+Outputs:
+  BastionSecurityGroup:
+    Description: The bastion security group of bastion host
+    Value: !Ref BastionSecurityGroup
+    Export:
+      Name: ${self:provider.stage}-BastionSecurityGroup
