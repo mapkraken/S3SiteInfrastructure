@@ -1,5 +1,7 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: VPC setup for sit-mapkraken with public subnet routing
+
 Resources:
-  # New Resources for ALB and Fargate
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -8,7 +10,8 @@ Resources:
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Sub "sit-mapkraken-vpc"
+          Value: !Sub "${self:provider.stage}-mapkraken-vpc"
+
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
@@ -18,7 +21,7 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub "${self:provider.stage}-${self:custom.namespace}-public-subnet-1"
+          Value: !Sub "${self:provider.stage}-mapkraken-public-subnet-1"
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
@@ -29,8 +32,8 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub "${self:provider.stage}-${self:custom.namespace}-public-subnet-2"
-  
+          Value: !Sub "${self:provider.stage}-mapkraken-public-subnet-2"
+
   PrivateSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
@@ -40,7 +43,8 @@ Resources:
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub "${self:provider.stage}-${self:custom.namespace}-private-subnet-1"
+          Value: !Sub "${self:provider.stage}-mapkraken-private-subnet-1"
+
   PrivateSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
@@ -50,14 +54,14 @@ Resources:
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub "${self:provider.stage}-${self:custom.namespace}-private-subnet-2"
+          Value: !Sub "${self:provider.stage}-mapkraken-private-subnet-2"
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
         - Key: Name
-          Value: !Sub "${self:provider.stage}-${self:custom.namespace}-igw"
+          Value: !Sub "${self:provider.stage}-mapkraken-igw"
 
   AttachGateway:
     Type: AWS::EC2::VPCGatewayAttachment
@@ -65,45 +69,35 @@ Resources:
       VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
 
-  RouteTable:
+  PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub "${self:provider.stage}-${self:custom.namespace}-route-table"
-  Route:
+          Value: !Sub "${self:provider.stage}-mapkraken-public-rt"
+
+  PublicRoute:
     Type: AWS::EC2::Route
     DependsOn: AttachGateway
     Properties:
-      RouteTableId: !Ref RouteTable
+      RouteTableId: !Ref PublicRouteTable
       DestinationCidrBlock: "0.0.0.0/0"
       GatewayId: !Ref InternetGateway
 
-  SubnetRouteTableAssociation1:
+  PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubnet1
-      RouteTableId: !Ref RouteTable
+      RouteTableId: !Ref PublicRouteTable
 
-  SubnetRouteTableAssociation2:
+  PublicSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubnet2
-      RouteTableId: !Ref RouteTable
-  # TODO: Private subnet here when needed
-  # ECSCluster:
-  #   Type: AWS::ECS::Cluster
-  #   Properties:
-  #     ClusterName: !Sub "${self:provider.stage}-${self:custom.namespace}-cluster"
-  #     Tags:
-  #       - Key: Stage
-  #         Value: ${self:provider.stage}
-  #       - Key: Namespace
-  #         Value: ${self:custom.namespace}
-  #       - Key: Name
-  #         Value: !Sub "${self:provider.stage}-${self:custom.namespace}-cluster"
-Outputs: 
+      RouteTableId: !Ref PublicRouteTable
+
+Outputs:
   PublicSubnet1:
     Value: !Ref PublicSubnet1
     Export:
