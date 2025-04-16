@@ -1,0 +1,18 @@
+{
+  "name": "rds-init-lambda",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy:lambda:sit": "./rds-init-lambda/scripts/deploy-lambda.sh sit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.1692.0",
+    "axios": "^1.8.4",
+    "pg": "^8.14.1"
+  }
+}

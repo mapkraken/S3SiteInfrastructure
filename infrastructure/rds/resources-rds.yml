@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: PostgreSQL with PostGIS on RDS for geospatial data
+
+Parameters:
+  BastionAllowedIp:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: IP range for SSH access (e.g., 203.0.113.45/32)
+
+Resources:
+  # RDS Subnet Group
+  RDSSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for PostgreSQL with PostGIS
+      SubnetIds:
+        - !ImportValue ${self:provider.stage}-PrivateSubnet1
+        - !ImportValue ${self:provider.stage}-PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-postgis-subnet-group"
+
+  # Security Group for Koop (no egress rule needed)
+  KoopSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Koop container
+      VpcId: !ImportValue ${self:provider.stage}-VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-koop-sg"
+
+  # Security Group for RDS
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: 
+      - BastionSecurityGroup
+    Properties:
+      GroupDescription: Security group for PostgreSQL RDS with PostGIS
+      VpcId: !ImportValue ${self:provider.stage}-VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref BastionSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-postgis-sg"
+  
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Bastion host security group
+      VpcId: !ImportValue "${self:provider.stage}-VPC"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref BastionAllowedIp
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 0.0.0.0/0
+
+  # RDS Instance with PostgreSQL
+  PostgresDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub "${self:provider.stage}-koop-postgis"
+      Engine: postgres
+      EngineVersion: "17.4"
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: "20"
+      StorageType: gp2
+      MasterUsername: '{{resolve:secretsmanager:${self:provider.stage}/rds/postgis-secret:SecretString:username}}'
+      MasterUserPassword: '{{resolve:secretsmanager:${self:provider.stage}/rds/postgis-secret:SecretString:password}}'
+      VPCSecurityGroups:
+        - !Ref RDSSecurityGroup
+      PubliclyAccessible: false
+      DBSubnetGroupName: !Ref RDSSubnetGroup
+      MultiAZ: false
+      BackupRetentionPeriod: 7
+      PreferredBackupWindow: "03:00-04:00"
+      PreferredMaintenanceWindow: "sun:05:00-sun:06:00"
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-koop-postgis"
+
+Outputs:
+  PostgresEndpoint:
+    Description: Endpoint to connect to the PostgreSQL database
+    Value: !GetAtt PostgresDB.Endpoint.Address
+  PostgresPort:
+    Description: Port for the PostgreSQL database
+    Value: !GetAtt PostgresDB.Endpoint.Port
+  RDSSecurityGroupId:
+    Description: Security Group ID for the PostgreSQL RDS
+    Value: !Ref RDSSecurityGroup
+    Export:
+      Name: !Sub "${self:provider.stage}-RDSSecurityGroupId"
+  BastionSecurityGroup:
+    Description: The bastion security group of bastion host
+    Value: !Ref BastionSecurityGroup
+    Export:
+      Name: ${self:provider.stage}-BastionSecurityGroup
