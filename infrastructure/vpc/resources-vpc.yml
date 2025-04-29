@@ -17,7 +17,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: "10.0.1.0/24"
-      AvailabilityZone: !Select [0, !GetAZs ""]
+      AvailabilityZone: !Sub "${AWS::Region}a"
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
@@ -28,7 +28,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: "10.0.2.0/24"
-      AvailabilityZone: !Select [1, !GetAZs ""]
+      AvailabilityZone: !Sub "${AWS::Region}b"
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
@@ -40,7 +40,6 @@ Resources:
       VpcId: !Ref VPC
       CidrBlock: "10.0.3.0/24"
       AvailabilityZone: !Select [0, !GetAZs ""]
-      MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
           Value: !Sub "${self:provider.stage}-mapkraken-private-subnet-1"
@@ -51,7 +50,6 @@ Resources:
       VpcId: !Ref VPC
       CidrBlock: "10.0.4.0/24"
       AvailabilityZone: !Select [1, !GetAZs ""]
-      MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
           Value: !Sub "${self:provider.stage}-mapkraken-private-subnet-2"
@@ -77,6 +75,7 @@ Resources:
         - Key: Name
           Value: !Sub "${self:provider.stage}-mapkraken-public-rt"
 
+
   PublicRoute:
     Type: AWS::EC2::Route
     DependsOn: AttachGateway
@@ -84,6 +83,17 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
       DestinationCidrBlock: "0.0.0.0/0"
       GatewayId: !Ref InternetGateway
+
+    # Route Table for Private Subnets (no internet gateway for true private subnets)
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-mapkraken-private-rt"
+
+  
 
   PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -96,6 +106,18 @@ Resources:
     Properties:
       SubnetId: !Ref PublicSubnet2
       RouteTableId: !Ref PublicRouteTable
+
+  PrivateRouteTableAssociationubnet1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateRouteTableAssociationSubnet2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
 
 Outputs:
   PublicSubnet1:
