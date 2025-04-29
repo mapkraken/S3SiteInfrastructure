@@ -16,6 +16,21 @@ Resources:
       Tags:
         - Key: Stage
           Value: ${self:provider.stage}
+  
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn:
+      - SiteBucket
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action: 
+              - "s3:GetObject"
+            Resource: !Join ['', ['arn:aws:s3:::', !Ref SiteBucket, '/*']]
 
   SiteBucketLabs:
     Type: AWS::S3::Bucket
@@ -32,21 +47,6 @@ Resources:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
 
-  BucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    DependsOn:
-      - SiteBucket
-    Properties:
-      Bucket: !Ref SiteBucket
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal: "*"
-            Action: 
-              - "s3:GetObject"
-            Resource: !Join ['', ['arn:aws:s3:::', !Ref SiteBucket, '/*']]
-
   BucketPolicyLabs:
     Type: AWS::S3::BucketPolicy
     DependsOn:
@@ -61,6 +61,23 @@ Resources:
             Action:
               - "s3:GetObject"
             Resource: !Join ['', ['arn:aws:s3:::', !Ref SiteBucketLabs, '/*']]
+  
+  LambdaCodeBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: ${self:provider.stage}-lambda-code-bucket-koop
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Name
+          Value: ${self:provider.stage}-lambda-code-bucket-koop
+        - Key: Purpose
+          Value: Lambda Deployment Packages
 
 Outputs:
   BucketName:
@@ -73,4 +90,9 @@ Outputs:
     Value: !Ref SiteBucketLabs
     Export:
       Name: !Sub "${self:provider.stage}-BucketNameLabs"
+  LambdaCodeBucket:
+    Description: "Name of the ${self:custom.environment.APP_NAME} site bucket in labs"
+    Value: !Ref LambdaCodeBucket
+    Export:
+      Name: !Sub "${self:provider.stage}-LambdaCodeBucket"
 
