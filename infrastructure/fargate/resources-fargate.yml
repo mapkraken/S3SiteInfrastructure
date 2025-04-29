@@ -23,6 +23,19 @@ Resources:
                   - "logs:CreateLogStream"
                   - "logs:PutLogEvents"
                 Resource: "*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:CreateLogGroup
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/${self:provider.stage}-koop:*"
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: 
+                  - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${self:provider.stage}/rds/postgis-secret"
+                  - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${self:provider.stage}/rds/postgis-secret-*"
+
   TaskRole:
     Type: AWS::IAM::Role
     DependsOn: 
@@ -52,6 +65,7 @@ Resources:
                   - - "arn:aws:s3:::"
                     - !Ref TerriamapSharingBucket
                     - "/*"
+
   TerriamapTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     DependsOn: 
@@ -72,29 +86,7 @@ Resources:
           PortMappings:
             - ContainerPort: 3001
           Essential: true
-
-  FargateSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: "Security group for Fargate tasks"
-      VpcId: !ImportValue ${self:provider.stage}-VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          SourceSecurityGroupId: !ImportValue ${self:provider.stage}-ALBSecurityGroup
-        - IpProtocol: tcp
-          FromPort: 3001
-          ToPort: 3001
-          SourceSecurityGroupId: !ImportValue ${self:provider.stage}-ALBSecurityGroup
-        - IpProtocol: tcp
-          FromPort: 9000
-          ToPort: 9000
-          SourceSecurityGroupId: !ImportValue ${self:provider.stage}-ALBSecurityGroup
-      Tags:
-        - Key: Name
-          Value: !Sub "${self:provider.stage}-terriamap-fargate-sg"
-
+          
   TerriamapFargateService:
     Type: AWS::ECS::Service
     DependsOn: 
@@ -111,7 +103,7 @@ Resources:
             - Fn::ImportValue: ${self:provider.stage}-PublicSubnet1
             - Fn::ImportValue: ${self:provider.stage}-PublicSubnet2
           SecurityGroups:
-            - !Ref FargateSecurityGroup
+            - !ImportValue ${self:provider.stage}-FargateSecurityGroup
           AssignPublicIp: ENABLED
       LoadBalancers:
         - TargetGroupArn: !ImportValue ${self:provider.stage}-TargetGroupTerriamapARN
@@ -124,11 +116,14 @@ Resources:
     Properties:
       LogGroupName: !Sub "/ecs/${self:provider.stage}-koop"
       RetentionInDays: 30
+    
   # Task Definition
   KoopTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     DependsOn: 
       - KoopLogGroup
+      - TaskExecutionRole
+      - TaskRole
     Properties:
       Family: !Sub "${self:provider.stage}-koop-task"
       NetworkMode: awsvpc
@@ -137,14 +132,33 @@ Resources:
       Cpu: "256" # 0.25 vCPU
       Memory: "512" # 512 MB
       ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
       ContainerDefinitions:
         - Name: koop
           Image: ${self:custom.environment.KOOP_ECR_URL}
           PortMappings:
             - ContainerPort: ${self:custom.environment.KOOP_CONTAINER_PORT}
-              HostPort: ${self:custom.environment.KOOP_CONTAINER_PORT}
               Protocol: tcp
           Essential: true
+          Environment:
+            - Name: PORT
+              Value: ${self:custom.environment.KOOP_CONTAINER_PORT}
+            - Name: PG_HOST
+              Value: !ImportValue ${self:provider.stage}-PostgresEndpoint 
+            - Name: PG_PORT
+              Value: "5432"
+            - Name: PG_DATABASE
+              Value: koop
+            - Name: PG_OBJECTID
+              Value: gid
+            - Name: PG_LIMIT
+              Value: "1000"
+            - Name: PG_USER
+              Value: '{{resolve:secretsmanager:${self:provider.stage}/rds/postgis-secret:SecretString:username}}'
+            - Name: PG_PASSWORD
+              Value: '{{resolve:secretsmanager:${self:provider.stage}/rds/postgis-secret:SecretString:password}}'
+            - Name: PG_SSL
+              Value: "true"
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -167,18 +181,9 @@ Resources:
             - Fn::ImportValue: ${self:provider.stage}-PublicSubnet1
             - Fn::ImportValue: ${self:provider.stage}-PublicSubnet2
           SecurityGroups:
-            - !Ref FargateSecurityGroup
+            - !ImportValue ${self:provider.stage}-FargateSecurityGroup
           AssignPublicIp: ENABLED
       LoadBalancers:
         - TargetGroupArn: !ImportValue ${self:provider.stage}-TargetGroupKoopARN
           ContainerName: koop
-          ContainerPort: 9000
-  # ApiARecord:
-  #   Type: AWS::Route53::RecordSet
-  #   Properties:
-  #     HostedZoneId: !ImportValue prd-HostedZoneId
-  #     Name: !If [OnlyCreateResourceInPRD, "api.${self:custom.environment.DOMAIN_NAME}.", "${self:provider.stage}-api.${self:custom.environment.DOMAIN_NAME}."]
-  #     Type: "A"
-  #     AliasTarget:
-  #       HostedZoneId: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
-  #       DNSName: !GetAtt ApplicationLoadBalancer.DNSName
+          ContainerPort: ${self:custom.environment.KOOP_CONTAINER_PORT}
