@@ -5,10 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "deploy:infrastructure:sit": "serverless deploy --stage sit --region us-east-1 --verbose", 
-    
-    "deploy:all:sit": "serverless deploy --stage sit --region us-east-1 --verbose && npm run deploy:lambda:sit",
-    "deploy:lambda:sit": "./rds-init-lambda/scripts/deploy-lambda.sh sit"
+    "database:migration": "bash -x ./scripts/run-migrations.sh",
+    "deploy:sit": "serverless deploy --stage sit --region us-east-1 --verbose"
   },
   "keywords": [
     "RDS",
@@ -21,5 +19,8 @@
   "dependencies": {
     "save": "^2.9.0",
     "serverless": "^4.6.3"
+  },
+  "devDependencies": {
+    "serverless-scriptable-plugin": "^1.3.1"
   }
 }

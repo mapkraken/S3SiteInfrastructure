@@ -12,9 +12,14 @@ provider:
       Environment: ${self:provider.stage}  # Changed to object format
       Project: mapkraken
       Stack: ${self:service}
-
+plugins:
+  - serverless-scriptable-plugin
 custom:
+  environment: ${file(./environment.yml):${self:provider.stage}}
   namespace: mapkraken
   namespaceShort: labs
+  scripts:
+    hooks:
+      'after:deploy:deploy': ./scripts/run-migrations.sh
 resources:
   - ${file(./resources-rds.yml)}

@@ -20,32 +20,6 @@ Resources:
         - Key: Name
           Value: !Sub "${self:provider.stage}-postgis-subnet-group"
 
-  # Security Group for Koop (no egress rule needed)
-  KoopSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security group for Koop container
-      VpcId: !ImportValue ${self:provider.stage}-VPC
-      Tags:
-        - Key: Name
-          Value: !Sub "${self:provider.stage}-koop-sg"
-
-  # Security Group for RDS
-  RDSSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    DependsOn: 
-      - BastionSecurityGroup
-    Properties:
-      GroupDescription: Security group for PostgreSQL RDS with PostGIS
-      VpcId: !ImportValue ${self:provider.stage}-VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 5432
-          ToPort: 5432
-          SourceSecurityGroupId: !Ref BastionSecurityGroup
-      Tags:
-        - Key: Name
-          Value: !Sub "${self:provider.stage}-postgis-sg"
   
   BastionSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -70,17 +44,27 @@ Resources:
           FromPort: 5432
           ToPort: 5432
           CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-bastion-sg"
 
   # RDS Instance with PostgreSQL
   PostgresDB:
     Type: AWS::RDS::DBInstance
+    DependsOn:
+      - RDSSubnetGroup
+      - PostgresParameterGroup
+      - RDSSecurityGroup
     Properties:
+      DBName: ${self:provider.stage}Koop
       DBInstanceIdentifier: !Sub "${self:provider.stage}-koop-postgis"
       Engine: postgres
       EngineVersion: "17.4"
       DBInstanceClass: db.t3.micro
       AllocatedStorage: "20"
       StorageType: gp2
+      AllowMajorVersionUpgrade: true
+      Port: 5432
       MasterUsername: '{{resolve:secretsmanager:${self:provider.stage}/rds/postgis-secret:SecretString:username}}'
       MasterUserPassword: '{{resolve:secretsmanager:${self:provider.stage}/rds/postgis-secret:SecretString:password}}'
       VPCSecurityGroups:
@@ -91,14 +75,197 @@ Resources:
       BackupRetentionPeriod: 7
       PreferredBackupWindow: "03:00-04:00"
       PreferredMaintenanceWindow: "sun:05:00-sun:06:00"
+      DBParameterGroupName: !Ref PostgresParameterGroup
       Tags:
         - Key: Name
           Value: !Sub "${self:provider.stage}-koop-postgis"
+
+  # Parameter Group for PostGIS
+  PostgresParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      DBParameterGroupName: !Sub "${self:provider.stage}-pg"
+      Family: postgres17
+      Description: Parameter group for PostGIS
+      Parameters:
+        rds.force_ssl: 0
+
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaRDSPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${self:provider.stage}/rds/postgis-secret-*"
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource:
+                  - !Sub "arn:aws:s3:::${self:provider.stage}-lambda-code-bucket-koop/*"
+                  - !Sub "arn:aws:s3:::${self:provider.stage}-lambda-code-bucket-koop"
+
+  KoopSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Koop container
+      VpcId: !ImportValue ${self:provider.stage}-VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-koop-sg"
+
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Lambda to access RDS
+      VpcId: !ImportValue ${self:provider.stage}-VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-lambda-sg"
+
+  # Security Group for Fargate (ECS)
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Fargate tasks
+      VpcId: !ImportValue ${self:provider.stage}-VPC
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 0.0.0.0/0  # Allow outbound to RDS
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref FargateSecurityGroup
+      Tags:
+        - Key: Name
+          Value: ${self:provider.stage}-ecs-sg
+
+  FargateSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security group for Fargate tasks"
+      VpcId: !ImportValue ${self:provider.stage}-VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !ImportValue ${self:provider.stage}-ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 3001
+          ToPort: 3001
+          SourceSecurityGroupId: !ImportValue ${self:provider.stage}-ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: ${self:custom.environment.KOOP_CONTAINER_PORT}
+          ToPort: ${self:custom.environment.KOOP_CONTAINER_PORT}
+          SourceSecurityGroupId: !ImportValue ${self:provider.stage}-ALBSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-terriamap-fargate-sg"
+  
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for RDS instance
+      VpcId: !ImportValue ${self:provider.stage}-VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref FargateSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref BastionSecurityGroup  # Updated to FargateSecurityGroup
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          DestinationSecurityGroupId: !ImportValue ${self:provider.stage}-FargateSecurityGroup  # Updated to FargateSecurityGroup
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-rds-sg"
+
+  SecretsManagerEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !ImportValue ${self:provider.stage}-VPC
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.secretsmanager
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !ImportValue ${self:provider.stage}-PrivateSubnet1
+        - !ImportValue ${self:provider.stage}-PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref RDSSecurityGroup
+  
+  ECRApiEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !ImportValue ${self:provider.stage}-VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.api"
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !ImportValue ${self:provider.stage}-PrivateSubnet1
+        - !ImportValue ${self:provider.stage}-PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref ECSSecurityGroup
+      PrivateDnsEnabled: true
+  
+  ECRDkrEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !ImportValue ${self:provider.stage}-VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.dkr"
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !ImportValue ${self:provider.stage}-PrivateSubnet1
+        - !ImportValue ${self:provider.stage}-PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref ECSSecurityGroup
+      PrivateDnsEnabled: true
 
 Outputs:
   PostgresEndpoint:
     Description: Endpoint to connect to the PostgreSQL database
     Value: !GetAtt PostgresDB.Endpoint.Address
+    Export:
+      Name: !Sub "${self:provider.stage}-PostgresEndpoint"
   PostgresPort:
     Description: Port for the PostgreSQL database
     Value: !GetAtt PostgresDB.Endpoint.Port
@@ -112,3 +279,8 @@ Outputs:
     Value: !Ref BastionSecurityGroup
     Export:
       Name: ${self:provider.stage}-BastionSecurityGroup
+  FargateSecurityGroup:
+    Description: The bastion security group of bastion host
+    Value: !Ref FargateSecurityGroup
+    Export:
+      Name: ${self:provider.stage}-FargateSecurityGroup
