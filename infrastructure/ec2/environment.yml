@@ -1,0 +1,8 @@
+sit:
+  MIGRATIONS_BUCKET_NAME: migrations
+
+stg: 
+  MIGRATIONS_BUCKET_NAME: migrations
+
+prd:
+  MIGRATIONS_BUCKET_NAME: migrations

@@ -13,9 +13,10 @@ provider:
       Project: mapkraken
       Stack: ${self:service}
 
+  
 custom:
+  environment: ${file(./environment.yml):${self:provider.stage}}
   namespace: mapkraken
   namespaceShort: labs
 resources:
-  # - ${file(./resources-bastion.yml)}
   - ${file(./resources-ec2.yml)}

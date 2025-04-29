@@ -1,42 +1,150 @@
----
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFormation template to set up an EC2 instance in a private subnet of sit-VPC for running Shmig with access to RDS.
+Description: EC2 Bastion Host with Shmig and PostgreSQL 17 for AL2023
 
 Parameters:
-  BastionAllowedIp:
+  UserDataHash:
     Type: String
-    Description: Your public IP address for SSH access (e.g., 203.0.113.45/32)
-    Default: 0.0.0.0/0 # Temporary wide-open for testing, tighten later
+    Default: v0.6  # Change this each time you want UserData to re-run
 
-Resources: 
+
+Resources:
   BastionHost:
+    DeletionPolicy: Delete
     Type: AWS::EC2::Instance
+    Metadata:
+      Comment: Force replacement on UserData change
     Properties:
       InstanceType: t2.micro
-      ImageId: ami-00a929b66ed6e0de6 # Amazon Linux 2 (adjust for region)
-      SubnetId: !ImportValue ${self:provider.stage}-PublicSubnet1
+      ImageId: ami-0c02fb55956c7d316 # AL2023, us-east-1 (update for your region)
+      SubnetId: !ImportValue "${self:provider.stage}-PublicSubnet1"
       SecurityGroupIds:
-        - !Ref BastionSecurityGroup
-      KeyName: ${self:provider.stage}-bastion-key-pair # Replace with your SSH key pair
+        - !ImportValue ${self:provider.stage}-BastionSecurityGroup
+      KeyName: !Sub "${self:provider.stage}-bastion-key-pair"
+      IamInstanceProfile: !Ref InstanceProfile
       Tags:
-        - Key: Name
-          Value: !Sub "${self:provider.stage}-bastion-key-pair"
+        - Key: UserDataHash
+          Value: !Ref UserDataHash
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash -xe
+          # Install CloudFormation helper scripts
+          yum install -y aws-cfn-bootstrap
 
-  BastionSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
+          # Define a logging function
+          log_message() {
+            local message="$1"
+            echo "$message" >> /tmp/userdata.log
+          }
+
+          log_message "UserData script started"
+
+          # Update packages
+          yum update -y
+
+          # Install necessary development tools and dependencies
+          yum groupinstall -y "Development Tools"
+          yum install -y icu libicu-devel gcc readline-devel zlib-devel bzip2-devel wget git jq
+
+          # Install PostgreSQL 17
+          log_message "Installing PostgreSQL 17"
+          wget https://ftp.postgresql.org/pub/source/v17.0/postgresql-17.0.tar.gz
+          tar -xvzf postgresql-17.0.tar.gz
+          cd postgresql-17.0
+          ./configure --prefix=/usr/local/pgsql
+          make
+          make install
+
+          # Create PostgreSQL user and data directory
+          useradd -m -s /bin/bash postgres
+          mkdir -p /usr/local/pgsql/data
+          chown postgres:postgres /usr/local/pgsql/data
+
+          # Initialize and start PostgreSQL
+          log_message "Initializing PostgreSQL"
+          sudo -u postgres /usr/local/pgsql/bin/initdb -D /usr/local/pgsql/data
+          sudo -u postgres /usr/local/pgsql/bin/pg_ctl start -D /usr/local/pgsql/data
+
+          # Configure PostgreSQL to allow remote connections
+          log_message "Configuring PostgreSQL for remote connections"
+          sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /usr/local/pgsql/data/postgresql.conf
+          echo "host all all 0.0.0.0/0 md5" >> /usr/local/pgsql/data/pg_hba.conf
+
+          # Set up the database and user
+          log_message "Setting up PostgreSQL database and user"
+          sudo -u postgres /usr/local/pgsql/bin/psql -c "CREATE USER bastionuser WITH PASSWORD 'securepassword';"
+          sudo -u postgres /usr/local/pgsql/bin/psql -c "CREATE DATABASE bastiondb OWNER bastionuser;"
+          sudo -u postgres /usr/local/pgsql/bin/psql -c "GRANT ALL PRIVILEGES ON DATABASE bastiondb TO bastionuser;"
+
+          SECRET_GITHUB=$(aws secretsmanager get-secret-value --secret-id sit/rds/github-pat-secret --region us-east-1 | jq -r '.SecretString')
+          GITHUB_USER=$(echo "$SECRET_GITHUB" | jq -r '.username')
+          GITHUB_PAT=$(echo "$SECRET_GITHUB" | jq -r '.password')
+          log_message "GITHUB_USER: $GITHUB_USER"
+          # Install Shmig for database migrations
+          log_message "Installing Shmig"
+          sudo git clone https://$GITHUB_USER:$GITHUB_PAT@github.com/mbucc/shmig.git /opt/shmig
+          log_message "chmodding shmig"
+          chmod +x /opt/shmig/shmig
+          log_message "exporting path"
+          export PATH=$PATH:/usr/local/pgsql/bin
+
+          log_message "Shmig installed"
+          log_message "$(ls -l /opt/shmig/shmig)"
+
+
+          # Fetch secrets from AWS Secrets Manager
+          SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id sit/rds/postgis-secret--region us-east-1 | jq -r '.SecretString')
+          log_message "SECRET_JSON: $SECRET_JSON"
+          # Parse username and password
+          DB_USER=$(echo $SECRET_JSON | jq -r .username)
+          DB_PASS=$(echo $SECRET_JSON | jq -r .password)
+          log_message "DB_USER: $DB_USER"
+          # # Configure Shmig
+          # log_message "Configuring Shmig"
+          log_message "Creating migration directory"
+          mkdir -p /opt/migrations
+          cat <<EOF > /opt/shmig/shmig.conf
+          TYPE=postgres
+          DATABASE=postgres
+          LOGIN=${DB_USER}
+          PASSWORD=${DB_PASS}
+          HOST=sit-koop-postgis.cuzcmegmyc31.us-east-1.rds.amazonaws.com
+          PORT=5432
+          MIGRATIONS=/opt/migrations
+          EOF
+
+  InstanceRole:
+    Type: AWS::IAM::Role
     Properties:
-      GroupDescription: Bastion host security group
-      VpcId: !ImportValue ${self:provider.stage}-VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: !Ref BastionAllowedIp
-          # CidrIp: 47.195.132.252/32 # Replace with your public IP
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: SecretsManagerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/rds/postgis-secret-*"
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: arn:aws:secretsmanager:us-east-1:273354623129:secret:sit/rds/github-pat-secret*
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref InstanceRole
 
 Outputs:
-  BastionSecurityGroup:
-    Description: The bastion security group of bastion host
-    Value: !Ref BastionSecurityGroup
-    Export:
-      Name: ${self:provider.stage}-BastionSecurityGroup
+  BastionPublicIp:
+    Value: !GetAtt BastionHost.PublicIp
+  InstanceId:
+    Value: !Ref BastionHost
+

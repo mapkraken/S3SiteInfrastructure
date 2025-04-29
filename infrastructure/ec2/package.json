@@ -4,7 +4,9 @@
   "description": "MapKrakenLabs EC2 resources",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy:sit": "serverless deploy --stage sit --region us-east-1 --verbose && npm run deploy:userdata:sit",
+    "deploy:userdata:sit": "bash ./deploy-userdata.sh"
   },
   "keywords": [
     "EC2",
