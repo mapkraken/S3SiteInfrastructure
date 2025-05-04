@@ -76,6 +76,24 @@ Resources:
         - Key: Name
           Value: !Sub "${self:provider.stage}-koop-tg"
 
+  TargetGroupPGTileserve:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${self:provider.stage}-pgtileserve-tg"
+      Port: 7800
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !ImportValue ${self:provider.stage}-VPC
+      HealthCheckPath: "/health"
+      HealthCheckProtocol: HTTP
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-pgtileserve-tg"
+
   ListenerHTTPTerriamap:
     Type: AWS::ElasticLoadBalancingV2::Listener
     DependsOn: TargetGroupTerriamap
@@ -97,6 +115,17 @@ Resources:
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroupKoop
+
+    # Listener for Koop
+  PGTileserveListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 7800
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroupPGTileserve
 
   ListenerHTTPSTerriamap:
     Type: AWS::ElasticLoadBalancingV2::Listener
@@ -128,6 +157,11 @@ Outputs:
     Value: !Ref TargetGroupTerriamap
     Export:
       Name: !Sub "${self:provider.stage}-TargetGroupTerriamapARN"
+  TargetGroupPGTileserveARN:
+    Description: "ARN of the Koop target group"
+    Value: !Ref TargetGroupPGTileserve
+    Export:
+      Name: !Sub "${self:provider.stage}-TargetGroupPGTileserveARN"
   TargetGroupTerriamapName:
     Description: "Name of the Terriamap target group"
     Value: !Sub "${self:provider.stage}-fargate-tg"
