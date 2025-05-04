@@ -6,7 +6,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "database:migration": "bash -x ./scripts/run-migrations.sh",
-    "deploy:sit": "serverless deploy --stage sit --region us-east-1 --verbose"
+    "database:migration:down": "bash -x ./scripts/migration-down.sh",
+    "deploy:sit": "serverless deploy --stage sit --region us-east-1 --verbose",
+    "import:census:fips": "bash ./scripts/run-import-census.sh"
   },
   "keywords": [
     "RDS",
@@ -21,6 +23,7 @@
     "serverless": "^4.6.3"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "serverless-scriptable-plugin": "^1.3.1"
   }
 }
