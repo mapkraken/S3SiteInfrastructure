@@ -115,7 +115,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/ecs/${self:provider.stage}-koop"
-      RetentionInDays: 30
+      RetentionInDays: 1
     
   # Task Definition
   KoopTaskDefinition:
@@ -187,3 +187,63 @@ Resources:
         - TargetGroupArn: !ImportValue ${self:provider.stage}-TargetGroupKoopARN
           ContainerName: koop
           ContainerPort: ${self:custom.environment.KOOP_CONTAINER_PORT}
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/pgtileserv
+      RetentionInDays: 1
+      Tags:
+        - Key: Name
+          Value: !Sub "${self:provider.stage}-pgtileserv-log-group"
+          
+  # ECS Task Definition
+  PGTileserviceDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: pgtileserv-task
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: "256" # 0.25 vCPU
+      Memory: "512" # 512 MB
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskExecutionRole.Arn
+      ContainerDefinitions:
+        - Name: pgtileserv
+          Image: pramsey/pg_tileserv:latest
+          PortMappings:
+            - ContainerPort: ${self:custom.environment.PGTILESERVICE_CONTAINER_PORT}
+              HostPort: ${self:custom.environment.PGTILESERVICE_CONTAINER_PORT}
+          Environment:
+          - Name: DATABASE_URL
+            Value: !Sub
+              - 'postgres://${DBUsername}:${DBPassword}@${DBHost}:5432/koop'
+              - DBUsername: '{{resolve:secretsmanager:${self:provider.stage}/rds/postgis-secret:SecretString:username}}'
+                DBPassword: '{{resolve:secretsmanager:${self:provider.stage}/rds/postgis-secret:SecretString:password}}'
+                DBHost: !ImportValue ${self:provider.stage}-PostgresEndpoint
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: pgtileserv
+  # ECS Service
+  PGTileService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !ImportValue  ${self:provider.stage}-ECSClusterName
+      DesiredCount: ${self:custom.environment.PGTILESERVICE_DESIRED_COUNT}
+      LaunchType: FARGATE
+      TaskDefinition: !Ref PGTileserviceDefinition
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets:
+            - Fn::ImportValue: ${self:provider.stage}-PublicSubnet1
+            - Fn::ImportValue: ${self:provider.stage}-PublicSubnet2
+          SecurityGroups:
+            - !ImportValue ${self:provider.stage}-FargateSecurityGroup
+          AssignPublicIp: ENABLED
+      LoadBalancers:
+        - ContainerName: pgtileserv
+          ContainerPort: ${self:custom.environment.PGTILESERVICE_CONTAINER_PORT}
+          TargetGroupArn: !ImportValue ${self:provider.stage}-TargetGroupPGTileserveARN

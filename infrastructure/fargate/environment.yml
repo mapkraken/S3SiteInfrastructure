@@ -3,6 +3,9 @@ sit:
   KOOP_DESIRED_COUNT: 0
   KOOP_DOMAIN: "${self:provider.stage}-koop.mapkraken.com"
   KOOP_ECR_URL: "${aws:accountId}.dkr.ecr.${self:provider.region}.amazonaws.com/${self:provider.stage}-koop:latest"
+  PGTILESERVICE_DOMAIN: "${self:provider.stage}-pgtileserice.mapkraken.com"
+  PGTILESERVICE_CONTAINER_PORT: 7800
+  PGTILESERVICE_DESIRED_COUNT: 0
   TERRIAMAP_CONTAINER_PORT: 3001
   TERRIAMAP_DESIRED_COUNT: 0
   TERRIAMAP_DOMAIN: "${self:provider.stage}-terriamap.mapkraken.com"
@@ -12,6 +15,9 @@ stg:
   KOOP_DESIRED_COUNT: 1
   KOOP_DOMAIN: "${self:provider.stage}-koop.mapkraken.com"
   KOOP_ECR_URL: "${aws:accountId}.dkr.ecr.${self:provider.region}.amazonaws.com/${self:provider.stage}-koop:latest"
+  PGTILESERVICE_DOMAIN: "${self:provider.stage}-pgtileserice.mapkraken.com"
+  PGTILESERVICE_CONTAINER_PORT: 7800
+  PGTILESERVICE_DESIRED_COUNT: 0
   TERRIAMAP_CONTAINER_PORT: 3001
   TERRIAMAP_DESIRED_COUNT: 1
   TERRIAMAP_DOMAIN: "${self:provider.stage}-terriamap.mapkraken.com"
@@ -21,6 +27,9 @@ prd:
   KOOP_DESIRED_COUNT: 1
   KOOP_DOMAIN: "${self:provider.stage}-koop.mapkraken.com"
   KOOP_ECR_URL: "${aws:accountId}.dkr.ecr.${self:provider.region}.amazonaws.com/${self:provider.stage}-koop:latest"
+  PGTILESERVICE_DOMAIN: "${self:provider.stage}-pgtileserice.mapkraken.com"
+  PGTILESERVICE_CONTAINER_PORT: 7800
+  PGTILESERVICE_DESIRED_COUNT: 0
   TERRIAMAP_CONTAINER_PORT: 3001
   TERRIAMAP_DESIRED_COUNT: 1
   TERRIAMAP_DOMAIN: "terriamap.mapkraken.com"
