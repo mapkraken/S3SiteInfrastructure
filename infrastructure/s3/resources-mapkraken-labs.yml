@@ -47,6 +47,37 @@ Resources:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
 
+  TerritoryMapperWebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: ${self:provider.stage}-territory-mapper-${self:custom.environment.BUCKET_NAME}      
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: false
+        RestrictPublicBuckets: false
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        # ErrorDocument: error.html
+      Tags:
+        - Key: Name
+          Value: !Sub territory.mapper.mapkraken.com
+    
+    # S3 Bucket Policy for Public Read Access
+  TerritoryMapperBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref TerritoryMapperWebsiteBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Sub arn:aws:s3:::${TerritoryMapperWebsiteBucket}/*
+
   BucketPolicyLabs:
     Type: AWS::S3::BucketPolicy
     DependsOn:

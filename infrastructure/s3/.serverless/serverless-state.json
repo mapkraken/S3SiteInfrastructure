@@ -1,0 +1,579 @@
+{
+  "service": {
+    "service": "s3",
+    "serviceObject": {
+      "name": "s3"
+    },
+    "provider": {
+      "name": "aws",
+      "runtime": "nodejs20.x",
+      "region": "us-east-1",
+      "stage": "sit",
+      "deploymentBucket": "sit-mapkraken-serverless-stacks",
+      "versionFunctions": true,
+      "deploymentBucketObject": {
+        "name": "sit-mapkraken-serverless-stacks",
+        "maxPreviousDeploymentArtifacts": 2,
+        "tags": {
+          "Environment": "sit",
+          "Project": "mapkraken",
+          "Stack": "s3"
+        }
+      },
+      "compiledCloudFormationTemplate": {
+        "AWSTemplateFormatVersion": "2010-09-09",
+        "Description": "The AWS CloudFormation template for this Serverless application",
+        "Resources": {
+          "SiteBucket": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+              "BucketName": "sit-mapkraken-bucket",
+              "WebsiteConfiguration": {
+                "IndexDocument": "index.html"
+              },
+              "PublicAccessBlockConfiguration": {
+                "BlockPublicAcls": true,
+                "IgnorePublicAcls": true,
+                "BlockPublicPolicy": false,
+                "RestrictPublicBuckets": false
+              },
+              "OwnershipControls": {
+                "Rules": [
+                  {
+                    "ObjectOwnership": "BucketOwnerEnforced"
+                  }
+                ]
+              },
+              "Tags": [
+                {
+                  "Key": "Stage",
+                  "Value": "sit"
+                }
+              ]
+            }
+          },
+          "BucketPolicy": {
+            "Type": "AWS::S3::BucketPolicy",
+            "DependsOn": [
+              "SiteBucket"
+            ],
+            "Properties": {
+              "Bucket": {
+                "Ref": "SiteBucket"
+              },
+              "PolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": [
+                      "s3:GetObject"
+                    ],
+                    "Resource": {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "arn:aws:s3:::",
+                          {
+                            "Ref": "SiteBucket"
+                          },
+                          "/*"
+                        ]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "SiteBucketLabs": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+              "BucketName": "sit-labs-mapkraken-bucket",
+              "WebsiteConfiguration": {
+                "IndexDocument": "index.html"
+              },
+              "PublicAccessBlockConfiguration": {
+                "BlockPublicAcls": true,
+                "IgnorePublicAcls": true,
+                "BlockPublicPolicy": false,
+                "RestrictPublicBuckets": false
+              },
+              "OwnershipControls": {
+                "Rules": [
+                  {
+                    "ObjectOwnership": "BucketOwnerEnforced"
+                  }
+                ]
+              }
+            }
+          },
+          "TerritoryMapperWebsiteBucket": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+              "BucketName": "sit-territory-mapper-mapkraken-bucket",
+              "PublicAccessBlockConfiguration": {
+                "BlockPublicAcls": true,
+                "IgnorePublicAcls": true,
+                "BlockPublicPolicy": false,
+                "RestrictPublicBuckets": false
+              },
+              "OwnershipControls": {
+                "Rules": [
+                  {
+                    "ObjectOwnership": "BucketOwnerEnforced"
+                  }
+                ]
+              },
+              "WebsiteConfiguration": {
+                "IndexDocument": "index.html"
+              },
+              "Tags": [
+                {
+                  "Key": "Name",
+                  "Value": {
+                    "Fn::Sub": "territory.mapper.mapkraken.com"
+                  }
+                }
+              ]
+            }
+          },
+          "TerritoryMapperBucketPolicy": {
+            "Type": "AWS::S3::BucketPolicy",
+            "Properties": {
+              "Bucket": {
+                "Ref": "TerritoryMapperWebsiteBucket"
+              },
+              "PolicyDocument": {
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": "s3:GetObject",
+                    "Resource": {
+                      "Fn::Sub": "arn:aws:s3:::${TerritoryMapperWebsiteBucket}/*"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "BucketPolicyLabs": {
+            "Type": "AWS::S3::BucketPolicy",
+            "DependsOn": [
+              "SiteBucketLabs"
+            ],
+            "Properties": {
+              "Bucket": {
+                "Ref": "SiteBucketLabs"
+              },
+              "PolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": [
+                      "s3:GetObject"
+                    ],
+                    "Resource": {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "arn:aws:s3:::",
+                          {
+                            "Ref": "SiteBucketLabs"
+                          },
+                          "/*"
+                        ]
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "LambdaCodeBucket": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+              "BucketName": "sit-lambda-code-bucket-koop",
+              "PublicAccessBlockConfiguration": {
+                "BlockPublicAcls": true,
+                "IgnorePublicAcls": true,
+                "BlockPublicPolicy": true,
+                "RestrictPublicBuckets": true
+              },
+              "VersioningConfiguration": {
+                "Status": "Enabled"
+              },
+              "Tags": [
+                {
+                  "Key": "Name",
+                  "Value": "sit-lambda-code-bucket-koop"
+                },
+                {
+                  "Key": "Purpose",
+                  "Value": "Lambda Deployment Packages"
+                }
+              ]
+            }
+          }
+        },
+        "Outputs": {
+          "ServerlessDeploymentBucketName": {
+            "Value": "sit-mapkraken-serverless-stacks",
+            "Export": {
+              "Name": "sls-s3-sit-ServerlessDeploymentBucketName"
+            }
+          },
+          "BucketName": {
+            "Description": "Name of the MapKraken site bucket",
+            "Value": {
+              "Ref": "SiteBucket"
+            },
+            "Export": {
+              "Name": {
+                "Fn::Sub": "sit-BucketName"
+              }
+            }
+          },
+          "BucketNameLabs": {
+            "Description": "Name of the MapKraken site bucket in labs",
+            "Value": {
+              "Ref": "SiteBucketLabs"
+            },
+            "Export": {
+              "Name": {
+                "Fn::Sub": "sit-BucketNameLabs"
+              }
+            }
+          },
+          "LambdaCodeBucket": {
+            "Description": "Name of the MapKraken site bucket in labs",
+            "Value": {
+              "Ref": "LambdaCodeBucket"
+            },
+            "Export": {
+              "Name": {
+                "Fn::Sub": "sit-LambdaCodeBucket"
+              }
+            }
+          }
+        },
+        "Conditions": {
+          "OnlyCreateResourceInPRD": {
+            "Fn::Equals": [
+              "sit",
+              "prd"
+            ]
+          }
+        }
+      }
+    },
+    "custom": {
+      "environment": {
+        "APP_NAME": "MapKraken",
+        "BUCKET_NAME": "mapkraken-bucket",
+        "DOMAIN_NAME": "mapkraken.com",
+        "ZONE_COMMENT": "Hosted zone for mapkraken.com and subdomains",
+        "HOSTED_ZONE_TAGS": [
+          {
+            "Key": "Environment",
+            "Value": "SIT"
+          },
+          {
+            "Key": "Project",
+            "Value": "MapKraken"
+          }
+        ]
+      },
+      "namespace": "mapkraken",
+      "namespaceShort": "labs",
+      "s3Sync": [
+        {
+          "bucketName": "sit-mapkraken-bucket",
+          "localDir": "./sync/mapkraken"
+        },
+        {
+          "bucketName": "sit-labs-mapkraken-bucket",
+          "localDir": "./sync/mapkraken-labs"
+        },
+        {
+          "bucketName": "sit-territory-mapper-mapkraken-bucket",
+          "localDir": "./sync/territory-mapper"
+        }
+      ]
+    },
+    "plugins": [
+      "serverless-s3-sync"
+    ],
+    "pluginsData": {},
+    "functions": {},
+    "resources": {
+      "Conditions": {
+        "OnlyCreateResourceInPRD": {
+          "Fn::Equals": [
+            "sit",
+            "prd"
+          ]
+        }
+      },
+      "Resources": {
+        "SiteBucket": {
+          "Type": "AWS::S3::Bucket",
+          "Properties": {
+            "BucketName": "sit-mapkraken-bucket",
+            "WebsiteConfiguration": {
+              "IndexDocument": "index.html"
+            },
+            "PublicAccessBlockConfiguration": {
+              "BlockPublicAcls": true,
+              "IgnorePublicAcls": true,
+              "BlockPublicPolicy": false,
+              "RestrictPublicBuckets": false
+            },
+            "OwnershipControls": {
+              "Rules": [
+                {
+                  "ObjectOwnership": "BucketOwnerEnforced"
+                }
+              ]
+            },
+            "Tags": [
+              {
+                "Key": "Stage",
+                "Value": "sit"
+              }
+            ]
+          }
+        },
+        "BucketPolicy": {
+          "Type": "AWS::S3::BucketPolicy",
+          "DependsOn": [
+            "SiteBucket"
+          ],
+          "Properties": {
+            "Bucket": {
+              "Ref": "SiteBucket"
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Principal": "*",
+                  "Action": [
+                    "s3:GetObject"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:aws:s3:::",
+                        {
+                          "Ref": "SiteBucket"
+                        },
+                        "/*"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "SiteBucketLabs": {
+          "Type": "AWS::S3::Bucket",
+          "Properties": {
+            "BucketName": "sit-labs-mapkraken-bucket",
+            "WebsiteConfiguration": {
+              "IndexDocument": "index.html"
+            },
+            "PublicAccessBlockConfiguration": {
+              "BlockPublicAcls": true,
+              "IgnorePublicAcls": true,
+              "BlockPublicPolicy": false,
+              "RestrictPublicBuckets": false
+            },
+            "OwnershipControls": {
+              "Rules": [
+                {
+                  "ObjectOwnership": "BucketOwnerEnforced"
+                }
+              ]
+            }
+          }
+        },
+        "TerritoryMapperWebsiteBucket": {
+          "Type": "AWS::S3::Bucket",
+          "Properties": {
+            "BucketName": "sit-territory-mapper-mapkraken-bucket",
+            "PublicAccessBlockConfiguration": {
+              "BlockPublicAcls": true,
+              "IgnorePublicAcls": true,
+              "BlockPublicPolicy": false,
+              "RestrictPublicBuckets": false
+            },
+            "OwnershipControls": {
+              "Rules": [
+                {
+                  "ObjectOwnership": "BucketOwnerEnforced"
+                }
+              ]
+            },
+            "WebsiteConfiguration": {
+              "IndexDocument": "index.html"
+            },
+            "Tags": [
+              {
+                "Key": "Name",
+                "Value": {
+                  "Fn::Sub": "territory.mapper.mapkraken.com"
+                }
+              }
+            ]
+          }
+        },
+        "TerritoryMapperBucketPolicy": {
+          "Type": "AWS::S3::BucketPolicy",
+          "Properties": {
+            "Bucket": {
+              "Ref": "TerritoryMapperWebsiteBucket"
+            },
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Principal": "*",
+                  "Action": "s3:GetObject",
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:s3:::${TerritoryMapperWebsiteBucket}/*"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "BucketPolicyLabs": {
+          "Type": "AWS::S3::BucketPolicy",
+          "DependsOn": [
+            "SiteBucketLabs"
+          ],
+          "Properties": {
+            "Bucket": {
+              "Ref": "SiteBucketLabs"
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Principal": "*",
+                  "Action": [
+                    "s3:GetObject"
+                  ],
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:aws:s3:::",
+                        {
+                          "Ref": "SiteBucketLabs"
+                        },
+                        "/*"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "LambdaCodeBucket": {
+          "Type": "AWS::S3::Bucket",
+          "Properties": {
+            "BucketName": "sit-lambda-code-bucket-koop",
+            "PublicAccessBlockConfiguration": {
+              "BlockPublicAcls": true,
+              "IgnorePublicAcls": true,
+              "BlockPublicPolicy": true,
+              "RestrictPublicBuckets": true
+            },
+            "VersioningConfiguration": {
+              "Status": "Enabled"
+            },
+            "Tags": [
+              {
+                "Key": "Name",
+                "Value": "sit-lambda-code-bucket-koop"
+              },
+              {
+                "Key": "Purpose",
+                "Value": "Lambda Deployment Packages"
+              }
+            ]
+          }
+        }
+      },
+      "Outputs": {
+        "BucketName": {
+          "Description": "Name of the MapKraken site bucket",
+          "Value": {
+            "Ref": "SiteBucket"
+          },
+          "Export": {
+            "Name": {
+              "Fn::Sub": "sit-BucketName"
+            }
+          }
+        },
+        "BucketNameLabs": {
+          "Description": "Name of the MapKraken site bucket in labs",
+          "Value": {
+            "Ref": "SiteBucketLabs"
+          },
+          "Export": {
+            "Name": {
+              "Fn::Sub": "sit-BucketNameLabs"
+            }
+          }
+        },
+        "LambdaCodeBucket": {
+          "Description": "Name of the MapKraken site bucket in labs",
+          "Value": {
+            "Ref": "LambdaCodeBucket"
+          },
+          "Export": {
+            "Name": {
+              "Fn::Sub": "sit-LambdaCodeBucket"
+            }
+          }
+        }
+      }
+    },
+    "configValidationMode": "warn",
+    "serviceFilename": "serverless.yml",
+    "initialServerlessConfig": {
+      "service": "s3",
+      "provider": {
+        "$ref": "$[\"service\"][\"provider\"]"
+      },
+      "plugins": {
+        "$ref": "$[\"service\"][\"plugins\"]"
+      },
+      "custom": {
+        "$ref": "$[\"service\"][\"custom\"]"
+      },
+      "resources": {
+        "$ref": "$[\"service\"][\"resources\"]"
+      }
+    },
+    "layers": {},
+    "isDashboardMonitoringPreconfigured": false
+  },
+  "package": {
+    "artifactDirectoryName": "serverless/s3/sit/1746664805848-2025-05-08T00:40:05.848Z",
+    "artifact": ""
+  }
+}

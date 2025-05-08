@@ -26,6 +26,8 @@ custom:
       localDir: ./sync/mapkraken
     - bucketName: ${self:provider.stage}-labs-${self:custom.environment.BUCKET_NAME}
       localDir: ./sync/mapkraken-labs
+    - bucketName: ${self:provider.stage}-territory-mapper-${self:custom.environment.BUCKET_NAME}
+      localDir: ./sync/territory-mapper
 
 resources:
   - ${file(./conditions.yml)}
