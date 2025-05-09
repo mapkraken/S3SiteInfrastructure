@@ -15,6 +15,10 @@ Resources:
           ToPort: 9000
           CidrIp: "0.0.0.0/0"
         - IpProtocol: tcp
+          FromPort: 7800 # koop
+          ToPort: 7800
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
           CidrIp: "0.0.0.0/0"
@@ -84,7 +88,7 @@ Resources:
       Protocol: HTTP
       TargetType: ip
       VpcId: !ImportValue ${self:provider.stage}-VPC
-      HealthCheckPath: "/health"
+      HealthCheckPath: "/"
       HealthCheckProtocol: HTTP
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 2
@@ -158,7 +162,7 @@ Outputs:
     Export:
       Name: !Sub "${self:provider.stage}-TargetGroupTerriamapARN"
   TargetGroupPGTileserveARN:
-    Description: "ARN of the Koop target group"
+    Description: "ARN of the PG Tileserve target group"
     Value: !Ref TargetGroupPGTileserve
     Export:
       Name: !Sub "${self:provider.stage}-TargetGroupPGTileserveARN"
