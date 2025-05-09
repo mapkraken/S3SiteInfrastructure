@@ -5,16 +5,20 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "database:migration": "bash -x ./scripts/run-migrations.sh",
+    "database:migration:up": "bash -x ./scripts/run-migrations.sh",
     "database:migration:down": "bash -x ./scripts/migration-down.sh",
     "deploy:sit": "serverless deploy --stage sit --region us-east-1 --verbose",
-    "import:census:fips": "bash ./scripts/run-import-census.sh"
+    "create:db:snapshot:sit": "bash -x ./scripts/create-snapshot.sh",
+    "delete:sit": "serverless remove --stage sit --region us-east-1 --verbose",
+    "import:census:fips": "bash ./scripts/run-import-census.sh $@"
   },
   "keywords": [
     "RDS",
     "Postgres",
-    "postGIS",
-    "MapKrakenLabs"
+    "PostGIS",
+    "MapKrakenLabs",
+    "AWS",
+    "Serverless"
   ],
   "author": "Tyler McCracken",
   "license": "ISC",
