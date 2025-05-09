@@ -9,6 +9,8 @@ Resources:
           - !If [OnlyCreateResourceInPRD, "terriamap.${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}-terriamap.${self:custom.environment.DOMAIN_NAME}"]
           - !If [OnlyCreateResourceInPRD, "koop.${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}-koop.${self:custom.environment.DOMAIN_NAME}"]
           - !If [OnlyCreateResourceInPRD, "api.${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}-api.${self:custom.environment.DOMAIN_NAME}"]
+          - !If [OnlyCreateResourceInPRD, "territory.mapper.${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}-territory.mapper.${self:custom.environment.DOMAIN_NAME}"]
+          - !If [OnlyCreateResourceInPRD, "pgtileserve.${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}-pgtileserve.${self:custom.environment.DOMAIN_NAME}"]
       ValidationMethod: DNS
       DomainValidationOptions:
           - DomainName: !If [OnlyCreateResourceInPRD, "${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}.${self:custom.environment.DOMAIN_NAME}"]
@@ -20,6 +22,10 @@ Resources:
           - DomainName: !If [OnlyCreateResourceInPRD, "koop.${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}-koop.${self:custom.environment.DOMAIN_NAME}"]
             HostedZoneId: !ImportValue "HostedZoneId"
           - DomainName: !If [OnlyCreateResourceInPRD, "api.${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}-api.${self:custom.environment.DOMAIN_NAME}"]
+            HostedZoneId: !ImportValue "HostedZoneId"
+          - DomainName: !If [OnlyCreateResourceInPRD, "territory.mapper.${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}-territory.mapper.${self:custom.environment.DOMAIN_NAME}"]
+            HostedZoneId: !ImportValue "HostedZoneId"
+          - DomainName: !If [OnlyCreateResourceInPRD, "pgtileserve.${self:custom.environment.DOMAIN_NAME}", "${self:provider.stage}-pgtileserve.${self:custom.environment.DOMAIN_NAME}"]
             HostedZoneId: !ImportValue "HostedZoneId"
 Outputs:
   CertificateArn:
