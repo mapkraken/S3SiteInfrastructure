@@ -103,10 +103,12 @@
   <div id="map"></div>
   <script>
 
-    // 👇 STEP 1: Get the Territory2 ID from the iframe URL
-    // const urlParams = new URLSearchParams(window.location.search);
-    // const territoryId = urlParams.get('territoryId');
-    // console.log('Territory2 ID:', territoryId);
+    // 👇Get the Territory2 ID from the iframe URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const territoryModelId = urlParams.get('territoryModelId');
+    const territoryId = urlParams.get('territoryId');
+    const orgId = urlParams.get('orgId') || 'default_user'; // Fallback if not provided
+    console.log('Territory Model Id: ', territoryModelId, 'Territory ID:', territoryId, 'Org ID:', orgId);
 
     const map = L.map('map', { boxZoom: false }).setView([27.9506, -82.4572], 10);
 
@@ -166,29 +168,11 @@
 
         L.DomEvent.on(save, 'click', (e) => {
           L.DomEvent.preventDefault(e);
-          alert('Saving selected features:\n' + Array.from(selectedFeatureIds).join(', '));
-        //   const selectedGeoids = Array.from(selectedFeatureIds);
-        //     const payload = {
-        //     territoryId,
-        //     geoids: selectedGeoids
-        //     };
-
-        //     fetch('https://your-api-or-server.com/save-boundary', {
-        //     method: 'POST',
-        //     headers: { 'Content-Type': 'application/json' },
-        //     body: JSON.stringify(payload)
-        //     })
-        //     .then(res => res.json())
-        //     .then(result => {
-        //     alert('Boundary saved!');
-        //     // optionally: call Salesforce to update Territory2 record
-        //     })
-        //     .catch(err => {
-        //     console.error('Error saving:', err);
-        //     alert('Failed to save boundary.');
-        //     });
-
+          alert('Saving selected features:\n' + Array.from(selectedFeatureIds).join(', '));          
+          selectedFeatureIds.forEach(id => vectorTileLayer.resetFeatureStyle(id));
+          selectedFeatureIds.clear();
           updateSelectionPanel();
+
         });
 
         return panel;
@@ -210,7 +194,7 @@
     }
 
     const vectorTileLayer = L.vectorGrid.protobuf(
-      'http://localhost:7800/public.census_block_groups_2024_view/{z}/{x}/{y}.pbf',
+      'https://sit-pgtileserve.mapkraken.com/public.census_block_groups_2024_view/{z}/{x}/{y}.pbf',
       {
         vectorTileLayerStyles: {
           'public.census_block_groups_2024_view': {
@@ -328,7 +312,6 @@
       });
 
       const url = `http://localhost:8080/pg/rest/services/public.census_block_groups_2024/FeatureServer/0/query?${params.toString()}`;
-
       fetch(url)
         .then(res => res.json())
         .then(data => {

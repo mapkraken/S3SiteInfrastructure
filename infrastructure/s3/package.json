@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "sync:sit": "serverless s3sync --stage sit --region us-east-1 --verbose",
+    "deploy:sit": "serverless deploy --stage sit --region us-east-1 --verbose"
   },
   "keywords": [
     "S3",
