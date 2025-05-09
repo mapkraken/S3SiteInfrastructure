@@ -110,6 +110,42 @@ Resources:
           SslSupportMethod: sni-only
           MinimumProtocolVersion: TLSv1.2_2021
         Comment: ${self:custom.environment.DISTRIBUTION_COMMENT_LABS}
+  
+  CloudFrontDistributionTerritoryMapper:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - DomainName: !Sub "${self:provider.stage}-territory-mapper-mapkraken-bucket.s3.us-east-1.amazonaws.com"
+            Id: S3Origin
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+            # S3OriginConfig:
+            #   OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${OAI}"
+        Enabled: true
+        DefaultRootObject: index.html
+        Aliases:
+          - !If [OnlyCreateResourceInPRD, !Sub "territory.mapper.${self:custom.environment.DOMAIN_NAME}", !Sub "${self:provider.stage}-territory.mapper.${self:custom.environment.DOMAIN_NAME}"]
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: ["GET", "HEAD", "OPTIONS"]
+          CachedMethods: ["GET", "HEAD"]
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          MinTTL: 0
+          DefaultTTL: 86400
+          MaxTTL: 31536000
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          AcmCertificateArn: !ImportValue ${self:provider.stage}-CertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        # Comment: ${self:custom.environment.DISTRIBUTION_COMMENT_LABS}
 
   CloudFrontDistributionTerriamap:
     Type: AWS::CloudFront::Distribution
@@ -201,6 +237,51 @@ Resources:
           MinimumProtocolVersion: TLSv1.2_2021
         HttpVersion: http2
         Comment: ${self:custom.environment.DISTRIBUTION_COMMENT_TERRIAMAP}
+
+  CloudFrontDistributionPGTileserve:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Origins:
+          - Id: ALBOrigin
+            DomainName: !ImportValue ${self:provider.stage}-ALBDNSName
+            CustomOriginConfig:
+              HTTPPort: 7800
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only  # Use 'match-viewer' if ALB uses HTTPS
+        DefaultCacheBehavior:
+          TargetOriginId: ALBOrigin
+          ViewerProtocolPolicy: allow-all  # Change to 'redirect-to-https' if using SSL
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+            - PUT
+            - POST
+            - PATCH
+            - DELETE
+          CachedMethods:
+            - GET
+            - HEAD
+          ForwardedValues:
+            QueryString: true
+            Cookies:
+              Forward: all
+            Headers:
+              - '*'
+          Compress: true
+          DefaultTTL: 86400  # 24 hours
+          MinTTL: 0
+          MaxTTL: 31536000  # 1 year
+        Aliases:
+          - !If [OnlyCreateResourceInPRD, !Sub "pgtileserve.${self:custom.environment.DOMAIN_NAME}", !Sub "${self:provider.stage}-pgtileserve.${self:custom.environment.DOMAIN_NAME}"]
+        ViewerCertificate:
+          AcmCertificateArn: !ImportValue ${self:provider.stage}-CertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        HttpVersion: http2
+        Comment: ${self:custom.environment.DISTRIBUTION_COMMENT_PGTILESERVE}
 # CloudFront Distribution for API
   # TODO - fuind out if this can be combined with the other distribution. 
   CloudFrontDistributionPortfolioApi:
@@ -285,6 +366,24 @@ Resources:
     Properties:
       HostedZoneId: !ImportValue HostedZoneId
       Name: !If [OnlyCreateResourceInPRD, "koop.${self:custom.environment.DOMAIN_NAME}.", "${self:provider.stage}-koop.${self:custom.environment.DOMAIN_NAME}."]
+      Type: "A"
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront Hosted Zone ID
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+  WebsiteARecordTerritoryMapper:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !ImportValue HostedZoneId
+      Name: !If [OnlyCreateResourceInPRD, "territory.mapper.${self:custom.environment.DOMAIN_NAME}.", "${self:provider.stage}-territory.mapper.${self:custom.environment.DOMAIN_NAME}."]
+      Type: "A"
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront Hosted Zone ID
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+  WebsiteARecordPGTileservice:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !ImportValue HostedZoneId
+      Name: !If [OnlyCreateResourceInPRD, "pgtileserve.${self:custom.environment.DOMAIN_NAME}.", "${self:provider.stage}-pgtileserve.${self:custom.environment.DOMAIN_NAME}."]
       Type: "A"
       AliasTarget:
         HostedZoneId: Z2FDTNDATAQYW2  # CloudFront Hosted Zone ID
