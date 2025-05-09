@@ -231,6 +231,7 @@ Resources:
   PGTileService:
     Type: AWS::ECS::Service
     Properties:
+      ServiceName: !Sub "${self:provider.stage}-pgtile-service"
       Cluster: !ImportValue  ${self:provider.stage}-ECSClusterName
       DesiredCount: ${self:custom.environment.PGTILESERVICE_DESIRED_COUNT}
       LaunchType: FARGATE

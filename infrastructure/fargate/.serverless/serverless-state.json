@@ -1,0 +1,1049 @@
+{
+  "service": {
+    "service": "fargate",
+    "serviceObject": {
+      "name": "fargate"
+    },
+    "provider": {
+      "name": "aws",
+      "runtime": "nodejs20.x",
+      "region": "us-east-1",
+      "stage": "sit",
+      "deploymentBucket": "sit-mapkraken-serverless-stacks",
+      "versionFunctions": true,
+      "deploymentBucketObject": {
+        "name": "sit-mapkraken-serverless-stacks",
+        "maxPreviousDeploymentArtifacts": 2,
+        "tags": {
+          "Environment": "sit",
+          "Project": "mapkraken",
+          "Stack": "fargate"
+        }
+      },
+      "compiledCloudFormationTemplate": {
+        "AWSTemplateFormatVersion": "2010-09-09",
+        "Description": "The AWS CloudFormation template for this Serverless application",
+        "Resources": {
+          "TaskExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+              "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": {
+                      "Service": "ecs-tasks.amazonaws.com"
+                    },
+                    "Action": "sts:AssumeRole"
+                  }
+                ]
+              },
+              "Policies": [
+                {
+                  "PolicyName": "ecs-task-execution-policy",
+                  "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "ecr:GetAuthorizationToken",
+                          "ecr:BatchCheckLayerAvailability",
+                          "ecr:GetDownloadUrlForLayer",
+                          "ecr:BatchGetImage",
+                          "logs:CreateLogStream",
+                          "logs:PutLogEvents"
+                        ],
+                        "Resource": "*"
+                      },
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "logs:CreateLogStream",
+                          "logs:PutLogEvents",
+                          "logs:CreateLogGroup"
+                        ],
+                        "Resource": {
+                          "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/sit-koop:*"
+                        }
+                      },
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "secretsmanager:GetSecretValue"
+                        ],
+                        "Resource": [
+                          {
+                            "Fn::Sub": "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:sit/rds/postgis-secret"
+                          },
+                          {
+                            "Fn::Sub": "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:sit/rds/postgis-secret-*"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "TaskRole": {
+            "Type": "AWS::IAM::Role",
+            "DependsOn": [
+              "TerriamapSharingBucket"
+            ],
+            "Properties": {
+              "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": {
+                      "Service": "ecs-tasks.amazonaws.com"
+                    },
+                    "Action": "sts:AssumeRole"
+                  }
+                ]
+              },
+              "Policies": [
+                {
+                  "PolicyName": "ecs-task-policy",
+                  "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "s3:PutObject",
+                          "s3:PutObjectAcl",
+                          "s3:GetObject",
+                          "s3:GetObjectAcl",
+                          "s3:ListBucket"
+                        ],
+                        "Resource": {
+                          "Fn::Join": [
+                            "",
+                            [
+                              "arn:aws:s3:::",
+                              {
+                                "Ref": "TerriamapSharingBucket"
+                              },
+                              "/*"
+                            ]
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "TerriamapTaskDefinition": {
+            "Type": "AWS::ECS::TaskDefinition",
+            "DependsOn": [
+              "TaskExecutionRole",
+              "TaskRole"
+            ],
+            "Properties": {
+              "Family": {
+                "Fn::Sub": "sit-terriamap-task"
+              },
+              "NetworkMode": "awsvpc",
+              "RequiresCompatibilities": [
+                "FARGATE"
+              ],
+              "Cpu": "256",
+              "Memory": "512",
+              "ExecutionRoleArn": {
+                "Fn::GetAtt": [
+                  "TaskExecutionRole",
+                  "Arn"
+                ]
+              },
+              "TaskRoleArn": {
+                "Fn::GetAtt": [
+                  "TaskRole",
+                  "Arn"
+                ]
+              },
+              "ContainerDefinitions": [
+                {
+                  "Name": "sit-terriamap-container",
+                  "Image": "273354623129.dkr.ecr.us-east-1.amazonaws.com/sit-terriamap",
+                  "PortMappings": [
+                    {
+                      "ContainerPort": 3001
+                    }
+                  ],
+                  "Essential": true
+                }
+              ]
+            }
+          },
+          "TerriamapFargateService": {
+            "Type": "AWS::ECS::Service",
+            "DependsOn": [
+              "TerriamapTaskDefinition"
+            ],
+            "Properties": {
+              "Cluster": {
+                "Fn::ImportValue": "sit-ECSClusterName"
+              },
+              "ServiceName": {
+                "Fn::Sub": "sit-terriamap-service"
+              },
+              "TaskDefinition": {
+                "Ref": "TerriamapTaskDefinition"
+              },
+              "DesiredCount": 0,
+              "LaunchType": "FARGATE",
+              "NetworkConfiguration": {
+                "AwsvpcConfiguration": {
+                  "Subnets": [
+                    {
+                      "Fn::ImportValue": "sit-PublicSubnet1"
+                    },
+                    {
+                      "Fn::ImportValue": "sit-PublicSubnet2"
+                    }
+                  ],
+                  "SecurityGroups": [
+                    {
+                      "Fn::ImportValue": "sit-FargateSecurityGroup"
+                    }
+                  ],
+                  "AssignPublicIp": "ENABLED"
+                }
+              },
+              "LoadBalancers": [
+                {
+                  "TargetGroupArn": {
+                    "Fn::ImportValue": "sit-TargetGroupTerriamapARN"
+                  },
+                  "ContainerName": {
+                    "Fn::Sub": "sit-terriamap-container"
+                  },
+                  "ContainerPort": 3001
+                }
+              ]
+            }
+          },
+          "KoopLogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+              "LogGroupName": {
+                "Fn::Sub": "/ecs/sit-koop"
+              },
+              "RetentionInDays": 1
+            }
+          },
+          "KoopTaskDefinition": {
+            "Type": "AWS::ECS::TaskDefinition",
+            "DependsOn": [
+              "KoopLogGroup",
+              "TaskExecutionRole",
+              "TaskRole"
+            ],
+            "Properties": {
+              "Family": {
+                "Fn::Sub": "sit-koop-task"
+              },
+              "NetworkMode": "awsvpc",
+              "RequiresCompatibilities": [
+                "FARGATE"
+              ],
+              "Cpu": "256",
+              "Memory": "512",
+              "ExecutionRoleArn": {
+                "Fn::GetAtt": [
+                  "TaskExecutionRole",
+                  "Arn"
+                ]
+              },
+              "TaskRoleArn": {
+                "Fn::GetAtt": [
+                  "TaskRole",
+                  "Arn"
+                ]
+              },
+              "ContainerDefinitions": [
+                {
+                  "Name": "koop",
+                  "Image": "273354623129.dkr.ecr.us-east-1.amazonaws.com/sit-koop:latest",
+                  "PortMappings": [
+                    {
+                      "ContainerPort": 9000,
+                      "Protocol": "tcp"
+                    }
+                  ],
+                  "Essential": true,
+                  "Environment": [
+                    {
+                      "Name": "PORT",
+                      "Value": 9000
+                    },
+                    {
+                      "Name": "PG_HOST",
+                      "Value": {
+                        "Fn::ImportValue": "sit-PostgresEndpoint"
+                      }
+                    },
+                    {
+                      "Name": "PG_PORT",
+                      "Value": "5432"
+                    },
+                    {
+                      "Name": "PG_DATABASE",
+                      "Value": "koop"
+                    },
+                    {
+                      "Name": "PG_OBJECTID",
+                      "Value": "gid"
+                    },
+                    {
+                      "Name": "PG_LIMIT",
+                      "Value": "1000"
+                    },
+                    {
+                      "Name": "PG_USER",
+                      "Value": "{{resolve:secretsmanager:sit/rds/postgis-secret:SecretString:username}}"
+                    },
+                    {
+                      "Name": "PG_PASSWORD",
+                      "Value": "{{resolve:secretsmanager:sit/rds/postgis-secret:SecretString:password}}"
+                    },
+                    {
+                      "Name": "PG_SSL",
+                      "Value": "true"
+                    }
+                  ],
+                  "LogConfiguration": {
+                    "LogDriver": "awslogs",
+                    "Options": {
+                      "awslogs-group": {
+                        "Ref": "KoopLogGroup"
+                      },
+                      "awslogs-region": {
+                        "Ref": "AWS::Region"
+                      },
+                      "awslogs-stream-prefix": "koop"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "KoopService": {
+            "Type": "AWS::ECS::Service",
+            "Properties": {
+              "Cluster": {
+                "Fn::ImportValue": "sit-ECSClusterName"
+              },
+              "ServiceName": {
+                "Fn::Sub": "sit-koop-service"
+              },
+              "TaskDefinition": {
+                "Ref": "KoopTaskDefinition"
+              },
+              "DesiredCount": 1,
+              "LaunchType": "FARGATE",
+              "NetworkConfiguration": {
+                "AwsvpcConfiguration": {
+                  "Subnets": [
+                    {
+                      "Fn::ImportValue": "sit-PublicSubnet1"
+                    },
+                    {
+                      "Fn::ImportValue": "sit-PublicSubnet2"
+                    }
+                  ],
+                  "SecurityGroups": [
+                    {
+                      "Fn::ImportValue": "sit-FargateSecurityGroup"
+                    }
+                  ],
+                  "AssignPublicIp": "ENABLED"
+                }
+              },
+              "LoadBalancers": [
+                {
+                  "TargetGroupArn": {
+                    "Fn::ImportValue": "sit-TargetGroupKoopARN"
+                  },
+                  "ContainerName": "koop",
+                  "ContainerPort": 9000
+                }
+              ]
+            }
+          },
+          "LogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+              "LogGroupName": "/ecs/pgtileserv",
+              "RetentionInDays": 1,
+              "Tags": [
+                {
+                  "Key": "Name",
+                  "Value": {
+                    "Fn::Sub": "sit-pgtileserv-log-group"
+                  }
+                }
+              ]
+            }
+          },
+          "PGTileserviceDefinition": {
+            "Type": "AWS::ECS::TaskDefinition",
+            "Properties": {
+              "Family": "pgtileserv-task",
+              "NetworkMode": "awsvpc",
+              "RequiresCompatibilities": [
+                "FARGATE"
+              ],
+              "Cpu": "256",
+              "Memory": "512",
+              "ExecutionRoleArn": {
+                "Fn::GetAtt": [
+                  "TaskExecutionRole",
+                  "Arn"
+                ]
+              },
+              "TaskRoleArn": {
+                "Fn::GetAtt": [
+                  "TaskExecutionRole",
+                  "Arn"
+                ]
+              },
+              "ContainerDefinitions": [
+                {
+                  "Name": "pgtileserv",
+                  "Image": "pramsey/pg_tileserv:latest",
+                  "PortMappings": [
+                    {
+                      "ContainerPort": 7800,
+                      "HostPort": 7800
+                    }
+                  ],
+                  "Environment": [
+                    {
+                      "Name": "DATABASE_URL",
+                      "Value": {
+                        "Fn::Sub": [
+                          "postgres://${DBUsername}:${DBPassword}@${DBHost}:5432/koop",
+                          {
+                            "DBUsername": "{{resolve:secretsmanager:sit/rds/postgis-secret:SecretString:username}}",
+                            "DBPassword": "{{resolve:secretsmanager:sit/rds/postgis-secret:SecretString:password}}",
+                            "DBHost": {
+                              "Fn::ImportValue": "sit-PostgresEndpoint"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "LogConfiguration": {
+                    "LogDriver": "awslogs",
+                    "Options": {
+                      "awslogs-group": {
+                        "Ref": "LogGroup"
+                      },
+                      "awslogs-region": {
+                        "Ref": "AWS::Region"
+                      },
+                      "awslogs-stream-prefix": "pgtileserv"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "PGTileService": {
+            "Type": "AWS::ECS::Service",
+            "Properties": {
+              "ServiceName": {
+                "Fn::Sub": "sit-pgtile-service"
+              },
+              "Cluster": {
+                "Fn::ImportValue": "sit-ECSClusterName"
+              },
+              "DesiredCount": 0,
+              "LaunchType": "FARGATE",
+              "TaskDefinition": {
+                "Ref": "PGTileserviceDefinition"
+              },
+              "NetworkConfiguration": {
+                "AwsvpcConfiguration": {
+                  "Subnets": [
+                    {
+                      "Fn::ImportValue": "sit-PublicSubnet1"
+                    },
+                    {
+                      "Fn::ImportValue": "sit-PublicSubnet2"
+                    }
+                  ],
+                  "SecurityGroups": [
+                    {
+                      "Fn::ImportValue": "sit-FargateSecurityGroup"
+                    }
+                  ],
+                  "AssignPublicIp": "ENABLED"
+                }
+              },
+              "LoadBalancers": [
+                {
+                  "ContainerName": "pgtileserv",
+                  "ContainerPort": 7800,
+                  "TargetGroupArn": {
+                    "Fn::ImportValue": "sit-TargetGroupPGTileserveARN"
+                  }
+                }
+              ]
+            }
+          },
+          "TerriamapSharingBucket": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+              "BucketName": "sit-terriamap-sharing"
+            }
+          }
+        },
+        "Outputs": {
+          "ServerlessDeploymentBucketName": {
+            "Value": "sit-mapkraken-serverless-stacks",
+            "Export": {
+              "Name": "sls-fargate-sit-ServerlessDeploymentBucketName"
+            }
+          }
+        }
+      }
+    },
+    "custom": {
+      "environment": {
+        "KOOP_CONTAINER_PORT": 9000,
+        "KOOP_DESIRED_COUNT": 1,
+        "KOOP_DOMAIN": "sit-koop.mapkraken.com",
+        "KOOP_ECR_URL": "273354623129.dkr.ecr.us-east-1.amazonaws.com/sit-koop:latest",
+        "PGTILESERVICE_DOMAIN": "sit-pgtileserice.mapkraken.com",
+        "PGTILESERVICE_CONTAINER_PORT": 7800,
+        "PGTILESERVICE_DESIRED_COUNT": 0,
+        "TERRIAMAP_CONTAINER_PORT": 3001,
+        "TERRIAMAP_DESIRED_COUNT": 0,
+        "TERRIAMAP_DOMAIN": "sit-terriamap.mapkraken.com",
+        "TERRIAMAP_ECR_URL": "273354623129.dkr.ecr.us-east-1.amazonaws.com/sit-terriamap:latest"
+      },
+      "namespace": "mapkraken-fargate",
+      "namespaceShort": "labs"
+    },
+    "pluginsData": {},
+    "functions": {},
+    "resources": {
+      "Resources": {
+        "TaskExecutionRole": {
+          "Type": "AWS::IAM::Role",
+          "Properties": {
+            "AssumeRolePolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Principal": {
+                    "Service": "ecs-tasks.amazonaws.com"
+                  },
+                  "Action": "sts:AssumeRole"
+                }
+              ]
+            },
+            "Policies": [
+              {
+                "PolicyName": "ecs-task-execution-policy",
+                "PolicyDocument": {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Effect": "Allow",
+                      "Action": [
+                        "ecr:GetAuthorizationToken",
+                        "ecr:BatchCheckLayerAvailability",
+                        "ecr:GetDownloadUrlForLayer",
+                        "ecr:BatchGetImage",
+                        "logs:CreateLogStream",
+                        "logs:PutLogEvents"
+                      ],
+                      "Resource": "*"
+                    },
+                    {
+                      "Effect": "Allow",
+                      "Action": [
+                        "logs:CreateLogStream",
+                        "logs:PutLogEvents",
+                        "logs:CreateLogGroup"
+                      ],
+                      "Resource": {
+                        "Fn::Sub": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/sit-koop:*"
+                      }
+                    },
+                    {
+                      "Effect": "Allow",
+                      "Action": [
+                        "secretsmanager:GetSecretValue"
+                      ],
+                      "Resource": [
+                        {
+                          "Fn::Sub": "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:sit/rds/postgis-secret"
+                        },
+                        {
+                          "Fn::Sub": "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:sit/rds/postgis-secret-*"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "TaskRole": {
+          "Type": "AWS::IAM::Role",
+          "DependsOn": [
+            "TerriamapSharingBucket"
+          ],
+          "Properties": {
+            "AssumeRolePolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Principal": {
+                    "Service": "ecs-tasks.amazonaws.com"
+                  },
+                  "Action": "sts:AssumeRole"
+                }
+              ]
+            },
+            "Policies": [
+              {
+                "PolicyName": "ecs-task-policy",
+                "PolicyDocument": {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Effect": "Allow",
+                      "Action": [
+                        "s3:PutObject",
+                        "s3:PutObjectAcl",
+                        "s3:GetObject",
+                        "s3:GetObjectAcl",
+                        "s3:ListBucket"
+                      ],
+                      "Resource": {
+                        "Fn::Join": [
+                          "",
+                          [
+                            "arn:aws:s3:::",
+                            {
+                              "Ref": "TerriamapSharingBucket"
+                            },
+                            "/*"
+                          ]
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "TerriamapTaskDefinition": {
+          "Type": "AWS::ECS::TaskDefinition",
+          "DependsOn": [
+            "TaskExecutionRole",
+            "TaskRole"
+          ],
+          "Properties": {
+            "Family": {
+              "Fn::Sub": "sit-terriamap-task"
+            },
+            "NetworkMode": "awsvpc",
+            "RequiresCompatibilities": [
+              "FARGATE"
+            ],
+            "Cpu": "256",
+            "Memory": "512",
+            "ExecutionRoleArn": {
+              "Fn::GetAtt": [
+                "TaskExecutionRole",
+                "Arn"
+              ]
+            },
+            "TaskRoleArn": {
+              "Fn::GetAtt": [
+                "TaskRole",
+                "Arn"
+              ]
+            },
+            "ContainerDefinitions": [
+              {
+                "Name": "sit-terriamap-container",
+                "Image": "273354623129.dkr.ecr.us-east-1.amazonaws.com/sit-terriamap",
+                "PortMappings": [
+                  {
+                    "ContainerPort": 3001
+                  }
+                ],
+                "Essential": true
+              }
+            ]
+          }
+        },
+        "TerriamapFargateService": {
+          "Type": "AWS::ECS::Service",
+          "DependsOn": [
+            "TerriamapTaskDefinition"
+          ],
+          "Properties": {
+            "Cluster": {
+              "Fn::ImportValue": "sit-ECSClusterName"
+            },
+            "ServiceName": {
+              "Fn::Sub": "sit-terriamap-service"
+            },
+            "TaskDefinition": {
+              "Ref": "TerriamapTaskDefinition"
+            },
+            "DesiredCount": 0,
+            "LaunchType": "FARGATE",
+            "NetworkConfiguration": {
+              "AwsvpcConfiguration": {
+                "Subnets": [
+                  {
+                    "Fn::ImportValue": "sit-PublicSubnet1"
+                  },
+                  {
+                    "Fn::ImportValue": "sit-PublicSubnet2"
+                  }
+                ],
+                "SecurityGroups": [
+                  {
+                    "Fn::ImportValue": "sit-FargateSecurityGroup"
+                  }
+                ],
+                "AssignPublicIp": "ENABLED"
+              }
+            },
+            "LoadBalancers": [
+              {
+                "TargetGroupArn": {
+                  "Fn::ImportValue": "sit-TargetGroupTerriamapARN"
+                },
+                "ContainerName": {
+                  "Fn::Sub": "sit-terriamap-container"
+                },
+                "ContainerPort": 3001
+              }
+            ]
+          }
+        },
+        "KoopLogGroup": {
+          "Type": "AWS::Logs::LogGroup",
+          "Properties": {
+            "LogGroupName": {
+              "Fn::Sub": "/ecs/sit-koop"
+            },
+            "RetentionInDays": 1
+          }
+        },
+        "KoopTaskDefinition": {
+          "Type": "AWS::ECS::TaskDefinition",
+          "DependsOn": [
+            "KoopLogGroup",
+            "TaskExecutionRole",
+            "TaskRole"
+          ],
+          "Properties": {
+            "Family": {
+              "Fn::Sub": "sit-koop-task"
+            },
+            "NetworkMode": "awsvpc",
+            "RequiresCompatibilities": [
+              "FARGATE"
+            ],
+            "Cpu": "256",
+            "Memory": "512",
+            "ExecutionRoleArn": {
+              "Fn::GetAtt": [
+                "TaskExecutionRole",
+                "Arn"
+              ]
+            },
+            "TaskRoleArn": {
+              "Fn::GetAtt": [
+                "TaskRole",
+                "Arn"
+              ]
+            },
+            "ContainerDefinitions": [
+              {
+                "Name": "koop",
+                "Image": "273354623129.dkr.ecr.us-east-1.amazonaws.com/sit-koop:latest",
+                "PortMappings": [
+                  {
+                    "ContainerPort": 9000,
+                    "Protocol": "tcp"
+                  }
+                ],
+                "Essential": true,
+                "Environment": [
+                  {
+                    "Name": "PORT",
+                    "Value": 9000
+                  },
+                  {
+                    "Name": "PG_HOST",
+                    "Value": {
+                      "Fn::ImportValue": "sit-PostgresEndpoint"
+                    }
+                  },
+                  {
+                    "Name": "PG_PORT",
+                    "Value": "5432"
+                  },
+                  {
+                    "Name": "PG_DATABASE",
+                    "Value": "koop"
+                  },
+                  {
+                    "Name": "PG_OBJECTID",
+                    "Value": "gid"
+                  },
+                  {
+                    "Name": "PG_LIMIT",
+                    "Value": "1000"
+                  },
+                  {
+                    "Name": "PG_USER",
+                    "Value": "{{resolve:secretsmanager:sit/rds/postgis-secret:SecretString:username}}"
+                  },
+                  {
+                    "Name": "PG_PASSWORD",
+                    "Value": "{{resolve:secretsmanager:sit/rds/postgis-secret:SecretString:password}}"
+                  },
+                  {
+                    "Name": "PG_SSL",
+                    "Value": "true"
+                  }
+                ],
+                "LogConfiguration": {
+                  "LogDriver": "awslogs",
+                  "Options": {
+                    "awslogs-group": {
+                      "Ref": "KoopLogGroup"
+                    },
+                    "awslogs-region": {
+                      "Ref": "AWS::Region"
+                    },
+                    "awslogs-stream-prefix": "koop"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "KoopService": {
+          "Type": "AWS::ECS::Service",
+          "Properties": {
+            "Cluster": {
+              "Fn::ImportValue": "sit-ECSClusterName"
+            },
+            "ServiceName": {
+              "Fn::Sub": "sit-koop-service"
+            },
+            "TaskDefinition": {
+              "Ref": "KoopTaskDefinition"
+            },
+            "DesiredCount": 1,
+            "LaunchType": "FARGATE",
+            "NetworkConfiguration": {
+              "AwsvpcConfiguration": {
+                "Subnets": [
+                  {
+                    "Fn::ImportValue": "sit-PublicSubnet1"
+                  },
+                  {
+                    "Fn::ImportValue": "sit-PublicSubnet2"
+                  }
+                ],
+                "SecurityGroups": [
+                  {
+                    "Fn::ImportValue": "sit-FargateSecurityGroup"
+                  }
+                ],
+                "AssignPublicIp": "ENABLED"
+              }
+            },
+            "LoadBalancers": [
+              {
+                "TargetGroupArn": {
+                  "Fn::ImportValue": "sit-TargetGroupKoopARN"
+                },
+                "ContainerName": "koop",
+                "ContainerPort": 9000
+              }
+            ]
+          }
+        },
+        "LogGroup": {
+          "Type": "AWS::Logs::LogGroup",
+          "Properties": {
+            "LogGroupName": "/ecs/pgtileserv",
+            "RetentionInDays": 1,
+            "Tags": [
+              {
+                "Key": "Name",
+                "Value": {
+                  "Fn::Sub": "sit-pgtileserv-log-group"
+                }
+              }
+            ]
+          }
+        },
+        "PGTileserviceDefinition": {
+          "Type": "AWS::ECS::TaskDefinition",
+          "Properties": {
+            "Family": "pgtileserv-task",
+            "NetworkMode": "awsvpc",
+            "RequiresCompatibilities": [
+              "FARGATE"
+            ],
+            "Cpu": "256",
+            "Memory": "512",
+            "ExecutionRoleArn": {
+              "Fn::GetAtt": [
+                "TaskExecutionRole",
+                "Arn"
+              ]
+            },
+            "TaskRoleArn": {
+              "Fn::GetAtt": [
+                "TaskExecutionRole",
+                "Arn"
+              ]
+            },
+            "ContainerDefinitions": [
+              {
+                "Name": "pgtileserv",
+                "Image": "pramsey/pg_tileserv:latest",
+                "PortMappings": [
+                  {
+                    "ContainerPort": 7800,
+                    "HostPort": 7800
+                  }
+                ],
+                "Environment": [
+                  {
+                    "Name": "DATABASE_URL",
+                    "Value": {
+                      "Fn::Sub": [
+                        "postgres://${DBUsername}:${DBPassword}@${DBHost}:5432/koop",
+                        {
+                          "DBUsername": "{{resolve:secretsmanager:sit/rds/postgis-secret:SecretString:username}}",
+                          "DBPassword": "{{resolve:secretsmanager:sit/rds/postgis-secret:SecretString:password}}",
+                          "DBHost": {
+                            "Fn::ImportValue": "sit-PostgresEndpoint"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "LogConfiguration": {
+                  "LogDriver": "awslogs",
+                  "Options": {
+                    "awslogs-group": {
+                      "Ref": "LogGroup"
+                    },
+                    "awslogs-region": {
+                      "Ref": "AWS::Region"
+                    },
+                    "awslogs-stream-prefix": "pgtileserv"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "PGTileService": {
+          "Type": "AWS::ECS::Service",
+          "Properties": {
+            "ServiceName": {
+              "Fn::Sub": "sit-pgtile-service"
+            },
+            "Cluster": {
+              "Fn::ImportValue": "sit-ECSClusterName"
+            },
+            "DesiredCount": 0,
+            "LaunchType": "FARGATE",
+            "TaskDefinition": {
+              "Ref": "PGTileserviceDefinition"
+            },
+            "NetworkConfiguration": {
+              "AwsvpcConfiguration": {
+                "Subnets": [
+                  {
+                    "Fn::ImportValue": "sit-PublicSubnet1"
+                  },
+                  {
+                    "Fn::ImportValue": "sit-PublicSubnet2"
+                  }
+                ],
+                "SecurityGroups": [
+                  {
+                    "Fn::ImportValue": "sit-FargateSecurityGroup"
+                  }
+                ],
+                "AssignPublicIp": "ENABLED"
+              }
+            },
+            "LoadBalancers": [
+              {
+                "ContainerName": "pgtileserv",
+                "ContainerPort": 7800,
+                "TargetGroupArn": {
+                  "Fn::ImportValue": "sit-TargetGroupPGTileserveARN"
+                }
+              }
+            ]
+          }
+        },
+        "TerriamapSharingBucket": {
+          "Type": "AWS::S3::Bucket",
+          "Properties": {
+            "BucketName": "sit-terriamap-sharing"
+          }
+        }
+      },
+      "Outputs": {}
+    },
+    "configValidationMode": "warn",
+    "serviceFilename": "serverless.yml",
+    "initialServerlessConfig": {
+      "service": "fargate",
+      "provider": {
+        "$ref": "$[\"service\"][\"provider\"]"
+      },
+      "custom": {
+        "$ref": "$[\"service\"][\"custom\"]"
+      },
+      "resources": {
+        "$ref": "$[\"service\"][\"resources\"]"
+      }
+    },
+    "layers": {},
+    "isDashboardMonitoringPreconfigured": false
+  },
+  "package": {
+    "artifactDirectoryName": "serverless/fargate/sit/1746731233637-2025-05-08T19:07:13.637Z",
+    "artifact": ""
+  }
+}
