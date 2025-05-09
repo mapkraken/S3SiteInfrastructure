@@ -16,6 +16,7 @@ ALTER TABLE public.census_block_groups_2024 ADD awater numeric(14) NULL;
 ALTER TABLE public.census_block_groups_2024 ADD intptlat varchar(11) NULL;
 ALTER TABLE public.census_block_groups_2024 ADD intptlon varchar(12) NULL;
 ALTER TABLE public.census_block_groups_2024 ADD wkb_geometry geometry(multipolygon, 4326) NULL;
+ALTER TABLE public.census_block_groups_2024 ADD geom geometry(multipolygon, 4326) NULL;
 ALTER TABLE public.census_block_groups_2024 ADD gid int4 NULL;
 
 -- Ensure geometry column is indexed for pg_tileserv
